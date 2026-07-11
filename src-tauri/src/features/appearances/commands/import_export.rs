@@ -145,6 +145,12 @@ pub async fn export_appearance_to_aec(category: AppearanceCategory, id: u32, pat
         }
     }
 
+    // Embed the sprite bytes inside the protobuf (field 7). This makes the `.aec`
+    // self-contained and byte-compatible with the C# Assets-Editor, which reads
+    // sprites from this same field. The IDs above were renumbered 0..n in the
+    // exact iteration order of `sprite_data`, so index k holds the PNG for id k.
+    appearance.sprite_data = sprite_data.clone();
+
     let mut container = Appearances::default();
     match category {
         AppearanceCategory::Objects => container.object.push(appearance),
@@ -168,6 +174,94 @@ pub async fn export_appearance_to_aec(category: AppearanceCategory, id: u32, pat
     // renumbered to 0..n in the same iteration order as `sprite_data`, so the
     // companion stores the bytes in that exact sequential order.
     write_aec_sprite_companion(&path, &sprite_data)?;
+
+    Ok(path)
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AppearanceRef {
+    pub category: AppearanceCategory,
+    pub id: u32,
+}
+
+/// Export several appearances into a single `.aec` bundle with the sprite bytes
+/// embedded in field 7 (byte-compatible with the C# Assets-Editor). Sprite IDs
+/// are renumbered globally 0..N across the whole bundle, mirroring the reference
+/// editor, and a `.aec.sprites` companion is written for older readers.
+#[tauri::command]
+pub async fn export_appearances_to_aec_bundle(items: Vec<AppearanceRef>, path: String, state: State<'_, AppState>) -> Result<String, String> {
+    if items.is_empty() {
+        return Err("No appearances selected for export".to_string());
+    }
+
+    let appearances_lock = state.appearances.read();
+    let appearances = appearances_lock.as_ref().ok_or_else(|| "No appearances loaded".to_string())?;
+
+    let sprite_loader_lock = state.sprite_loader.read();
+    let sprite_loader = sprite_loader_lock.as_ref();
+
+    let mut container = Appearances::default();
+    let mut all_sprites: Vec<Vec<u8>> = Vec::new();
+    let mut counter = 0u32;
+
+    for item in &items {
+        let list = get_items_by_category(appearances, &item.category);
+        let index_map = get_index_for_category(&state, &item.category);
+        let appearance = if let Some(idx) = index_map.get(&item.id) {
+            list.get(*idx)
+        } else {
+            list.iter().find(|app| app.id.unwrap_or(0) == item.id)
+        }
+        .ok_or_else(|| format!("Appearance with ID {} not found", item.id))?;
+
+        let mut appearance = appearance.clone();
+
+        let sprite_ids: Vec<u32> = appearance.frame_group.iter().filter_map(|fg| fg.sprite_info.as_ref()).flat_map(|info| info.sprite_id.iter().copied()).collect();
+
+        let mut sprite_data = Vec::with_capacity(sprite_ids.len());
+        for sprite_id in &sprite_ids {
+            if let Some(bytes) = state.imported_sprites.get(sprite_id) {
+                sprite_data.push(bytes.clone());
+                continue;
+            }
+            let loader = sprite_loader.ok_or_else(|| "No sprites loaded".to_string())?;
+            let sprite = loader.get_sprite(*sprite_id).map_err(|e| format!("Failed to get sprite {}: {}", sprite_id, e))?;
+            let bytes = sprite.to_png_bytes().map_err(|e| format!("Failed to convert sprite to PNG: {}", e))?;
+            sprite_data.push(bytes);
+        }
+
+        // Renumber this appearance's sprite IDs into the global 0..N sequence.
+        for fg in appearance.frame_group.iter_mut() {
+            if let Some(info) = fg.sprite_info.as_mut() {
+                for sprite_id in info.sprite_id.iter_mut() {
+                    *sprite_id = counter;
+                    counter += 1;
+                }
+            }
+        }
+
+        appearance.sprite_data = sprite_data.clone();
+        all_sprites.extend(sprite_data);
+
+        match item.category {
+            AppearanceCategory::Objects => container.object.push(appearance),
+            AppearanceCategory::Outfits => container.outfit.push(appearance),
+            AppearanceCategory::Effects => container.effect.push(appearance),
+            AppearanceCategory::Missiles => container.missile.push(appearance),
+        }
+    }
+
+    if let Some(parent) = Path::new(&path).parent() {
+        if !parent.as_os_str().is_empty() && !parent.exists() {
+            fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory {:?}: {}", parent, e))?;
+        }
+    }
+
+    let mut buf = Vec::new();
+    container.encode(&mut buf).map_err(|e| format!("Failed to encode AEC: {}", e))?;
+    fs::write(&path, buf).map_err(|e| format!("Failed to write file {}: {}", path, e))?;
+
+    write_aec_sprite_companion(&path, &all_sprites)?;
 
     Ok(path)
 }
@@ -319,24 +413,33 @@ pub async fn import_appearances_from_files_all(paths: Vec<String>, start_ids: Op
 
         if extension == "aec" {
             let mut aec = parse_aec_container(path)?;
-            let sprite_overrides = read_aec_sprite_companion(path)?;
+            // Prefer sprites embedded in the protobuf (field 7 — how the C#
+            // Assets-Editor and our own exports carry them). Fall back to the
+            // legacy `.aec.sprites` companion for older files that lack field 7.
+            let companion = read_aec_sprite_companion(path)?;
 
-            if !aec.outfit.is_empty() {
-                remap_imported_sprites(&mut aec.outfit, state.inner(), &sprite_overrides)?;
-                buckets.outfits.extend(aec.outfit.into_iter().map(ImportedAppearance::Proto));
-            }
-            if !aec.object.is_empty() {
-                remap_imported_sprites(&mut aec.object, state.inner(), &sprite_overrides)?;
-                buckets.objects.extend(aec.object.into_iter().map(ImportedAppearance::Proto));
-            }
-            if !aec.effect.is_empty() {
-                remap_imported_sprites(&mut aec.effect, state.inner(), &sprite_overrides)?;
-                buckets.effects.extend(aec.effect.into_iter().map(ImportedAppearance::Proto));
-            }
-            if !aec.missile.is_empty() {
-                remap_imported_sprites(&mut aec.missile, state.inner(), &sprite_overrides)?;
-                buckets.missiles.extend(aec.missile.into_iter().map(ImportedAppearance::Proto));
-            }
+            let ingest = |list: &mut Vec<Appearance>| -> Result<(), String> {
+                if list.is_empty() {
+                    return Ok(());
+                }
+                let embedded = take_embedded_sprite_overrides(list);
+                let overrides = if embedded.is_empty() {
+                    &companion
+                } else {
+                    &embedded
+                };
+                remap_imported_sprites(list, state.inner(), overrides)
+            };
+
+            ingest(&mut aec.outfit)?;
+            ingest(&mut aec.object)?;
+            ingest(&mut aec.effect)?;
+            ingest(&mut aec.missile)?;
+
+            buckets.outfits.extend(aec.outfit.into_iter().map(ImportedAppearance::Proto));
+            buckets.objects.extend(aec.object.into_iter().map(ImportedAppearance::Proto));
+            buckets.effects.extend(aec.effect.into_iter().map(ImportedAppearance::Proto));
+            buckets.missiles.extend(aec.missile.into_iter().map(ImportedAppearance::Proto));
         } else {
             let content = read_text_file(path)?;
             let imported: CompleteAppearanceItem = serde_json::from_str(&content).map_err(|e| format!("Failed to parse appearance JSON: {}", e))?;
@@ -1087,6 +1190,25 @@ fn detect_import_presence(paths: &[String]) -> Result<ImportPresence, String> {
     Ok(presence)
 }
 
+/// Drain the embedded sprite bytes (protobuf field 7) out of a set of imported
+/// appearances into an id→PNG override map keyed by each sprite's current
+/// (renumbered) id, then clear field 7 so the bytes never reach the live
+/// catalog. Mirrors the C# Assets-Editor's `SpriteData.Clear()` on import.
+fn take_embedded_sprite_overrides(appearances: &mut [Appearance]) -> HashMap<u32, Vec<u8>> {
+    let mut overrides = HashMap::new();
+    for appearance in appearances.iter_mut() {
+        if appearance.sprite_data.is_empty() {
+            continue;
+        }
+        let sprite_ids: Vec<u32> = appearance.frame_group.iter().filter_map(|fg| fg.sprite_info.as_ref()).flat_map(|info| info.sprite_id.iter().copied()).collect();
+        for (sprite_id, bytes) in sprite_ids.into_iter().zip(appearance.sprite_data.iter()) {
+            overrides.insert(sprite_id, bytes.clone());
+        }
+        appearance.sprite_data.clear();
+    }
+    overrides
+}
+
 fn remap_imported_sprites(appearances: &mut [Appearance], state: &AppState, sprite_overrides: &HashMap<u32, Vec<u8>>) -> Result<(), String> {
     let total_sprites: usize = appearances.iter().map(|appearance| appearance.frame_group.iter().filter_map(|fg| fg.sprite_info.as_ref()).map(|info| info.sprite_id.len()).sum::<usize>()).sum();
     if total_sprites == 0 {
@@ -1200,4 +1322,59 @@ fn next_imported_sprite_id(state: &AppState) -> Result<u32, String> {
     let end = start.checked_add(1).ok_or_else(|| "Imported sprite ID overflow".to_string())?;
     *next_id = Some(end);
     Ok(start)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::protobuf::{FrameGroup, SpriteInfo};
+
+    fn appearance_with(sprite_ids: Vec<u32>, sprite_data: Vec<Vec<u8>>) -> Appearance {
+        Appearance {
+            frame_group: vec![FrameGroup {
+                sprite_info: Some(SpriteInfo {
+                    sprite_id: sprite_ids,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }],
+            sprite_data,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn take_embedded_sprite_overrides_maps_by_id_and_clears_field7() {
+        // Mirrors a C#/AEC export: sprite ids renumbered 0..n, one PNG blob each.
+        let mut appearances = vec![appearance_with(vec![0, 1, 2], vec![vec![10], vec![20], vec![30]])];
+
+        let overrides = take_embedded_sprite_overrides(&mut appearances);
+
+        assert_eq!(overrides.len(), 3);
+        assert_eq!(overrides.get(&0), Some(&vec![10u8]));
+        assert_eq!(overrides.get(&1), Some(&vec![20u8]));
+        assert_eq!(overrides.get(&2), Some(&vec![30u8]));
+        // Field 7 must be drained so the bytes never reach the live catalog.
+        assert!(appearances[0].sprite_data.is_empty());
+    }
+
+    #[test]
+    fn take_embedded_sprite_overrides_spans_multiple_appearances() {
+        // Two appearances in one bundle keep globally-unique sprite ids.
+        let mut appearances = vec![appearance_with(vec![0, 1], vec![vec![1], vec![2]]), appearance_with(vec![2, 3], vec![vec![3], vec![4]])];
+
+        let overrides = take_embedded_sprite_overrides(&mut appearances);
+
+        assert_eq!(overrides.len(), 4);
+        assert_eq!(overrides.get(&3), Some(&vec![4u8]));
+        assert!(appearances.iter().all(|a| a.sprite_data.is_empty()));
+    }
+
+    #[test]
+    fn take_embedded_sprite_overrides_ignores_appearances_without_field7() {
+        // Legacy files (no embedded sprites) yield no overrides -> companion path.
+        let mut appearances = vec![appearance_with(vec![5], vec![])];
+        let overrides = take_embedded_sprite_overrides(&mut appearances);
+        assert!(overrides.is_empty());
+    }
 }

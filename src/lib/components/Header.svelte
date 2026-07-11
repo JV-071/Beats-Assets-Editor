@@ -8,6 +8,8 @@
   import SettingsMenu from "./SettingsMenu.svelte";
   import AboutDialog from "./AboutDialog.svelte";
   import ExportQueueModal from "./ExportQueueModal.svelte";
+  import ReorganizeIdsModal from "./ReorganizeIdsModal.svelte";
+  import { openReorganizeIds } from "../../stores/reorganizeIdsState.svelte";
   import {
     exportQueueState,
     openExportQueue,
@@ -141,6 +143,12 @@
 
       <button
         class="icon-btn"
+        title={translate("reorganize.tooltip")}
+        onclick={openReorganizeIds}>🔢</button
+      >
+
+      <button
+        class="icon-btn"
         title={translate("header.logger.tooltip")}
         onclick={toggleLogger}>📜</button
       >
@@ -156,6 +164,7 @@
 
 <AboutDialog show={isAboutOpen} closeDialog={closeAbout} />
 <ExportQueueModal />
+<ReorganizeIdsModal />
 
 <style>
   .export-queue-btn {

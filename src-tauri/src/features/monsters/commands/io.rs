@@ -1,13 +1,56 @@
-use crate::core::lua::escape_lua_string;
+use crate::core::fs_util::write_atomic;
+use crate::core::lua::{escape_lua_string, remap_lua_int_field};
 use crate::features::monsters::parsers::lua_parser::LuaMonsterParser;
 use crate::features::monsters::types::{Monster, MonsterListEntry};
 use anyhow::{Context, Result};
 use serde::Serialize;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use regex::Regex;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::command;
+
+#[derive(Serialize)]
+pub struct CascadeResult {
+    pub scanned: usize,
+    pub updated: usize,
+    pub replacements: usize,
+}
+
+/// Rewrite outfit ids (`lookType` / `lookMount`) across every monster `.lua`
+/// under `monsters_path` using the old→new `remap`. Surgical text edit that
+/// preserves custom Lua; each changed file is backed up to `<file>.bak`.
+#[command]
+pub async fn apply_outfit_remap_to_monsters(monsters_path: String, remap: Vec<(u32, u32)>) -> Result<CascadeResult, String> {
+    remap_monster_outfits(monsters_path, remap).map_err(|e| format!("Failed to remap monster outfits: {}", e))
+}
+
+fn remap_monster_outfits(monsters_path: String, remap: Vec<(u32, u32)>) -> Result<CascadeResult> {
+    let mut result = CascadeResult {
+        scanned: 0,
+        updated: 0,
+        replacements: 0,
+    };
+    let map: HashMap<u32, u32> = remap.into_iter().collect();
+    if map.is_empty() {
+        return Ok(result);
+    }
+
+    let base = PathBuf::from(&monsters_path);
+    for entry in list_monsters_recursive(Path::new(&monsters_path), &base)? {
+        result.scanned += 1;
+        let text = fs::read_to_string(&entry.file_path).with_context(|| format!("read {}", entry.file_path))?;
+        let (t1, c1) = remap_lua_int_field(&text, "lookType", &map);
+        let (t2, c2) = remap_lua_int_field(&t1, "lookMount", &map);
+        if c1 + c2 > 0 {
+            let _ = fs::copy(&entry.file_path, format!("{}.bak", entry.file_path));
+            write_atomic(Path::new(&entry.file_path), t2.as_bytes())?;
+            result.updated += 1;
+            result.replacements += c1 + c2;
+        }
+    }
+    Ok(result)
+}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]

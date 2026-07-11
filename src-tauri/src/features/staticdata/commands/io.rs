@@ -113,6 +113,62 @@ pub fn save_staticdata_file(path: String, state: State<'_, AppState>) -> Result<
     }
 }
 
+/// Rewrite outfit ids (`looktype` + `mount`) on every creature/monster and boss
+/// in the loaded staticdata doc using the old→new `remap`. Mutates the in-memory
+/// doc; the caller persists it via `save_staticdata_file`. Returns how many ids
+/// changed (0 when no staticdata is loaded).
+#[tauri::command]
+pub fn apply_outfit_remap_to_staticdata(remap: Vec<(u32, u32)>, state: State<'_, AppState>) -> Result<usize, String> {
+    if remap.is_empty() {
+        return Ok(0);
+    }
+    let map: std::collections::HashMap<u32, u32> = remap.into_iter().collect();
+    let mut lock = state.staticdata_doc.write();
+    let Some(doc) = lock.as_mut() else {
+        return Ok(0);
+    };
+
+    let mut changed = 0usize;
+    macro_rules! remap_outfit {
+        ($opt:expr) => {
+            if let Some(o) = $opt.as_mut() {
+                if let Some(id) = o.looktype {
+                    if let Some(n) = map.get(&id) {
+                        o.looktype = Some(*n);
+                        changed += 1;
+                    }
+                }
+                if let Some(id) = o.mount {
+                    if let Some(n) = map.get(&id) {
+                        o.mount = Some(*n);
+                        changed += 1;
+                    }
+                }
+            }
+        };
+    }
+
+    match doc {
+        StaticDataDoc::Old(o) => {
+            for c in o.creatures.iter_mut() {
+                remap_outfit!(c.outfit);
+            }
+            for b in o.bosses.iter_mut() {
+                remap_outfit!(b.outfit);
+            }
+        }
+        StaticDataDoc::New(n) => {
+            for c in n.monsters.iter_mut() {
+                remap_outfit!(c.outfit);
+            }
+            for b in n.bosses.iter_mut() {
+                remap_outfit!(b.outfit);
+            }
+        }
+    }
+    Ok(changed)
+}
+
 #[tauri::command]
 pub fn remove_staticdata_item(category: String, id: u32, state: State<'_, AppState>) -> Result<(), String> {
     let mut lock = state.staticdata_doc.write();

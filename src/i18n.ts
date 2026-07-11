@@ -891,11 +891,11 @@ const translationEntries = {
     ru: 'Путь Tibia не задан — сначала загрузите ассеты.'
   },
   'status.compileDone': {
-    default: 'Compiled {{count}} sprites into {{file}}',
-    'pt-BR': 'Compilados {{count}} sprites em {{file}}',
-    en: 'Compiled {{count}} sprites into {{file}}',
-    es: 'Compilados {{count}} sprites en {{file}}',
-    ru: 'Скомпилировано {{count}} спрайтов в {{file}}'
+    default: 'Compiled {{count}} sprites into {{sheets}} sheet(s)',
+    'pt-BR': 'Compilados {{count}} sprites em {{sheets}} sheet(s)',
+    en: 'Compiled {{count}} sprites into {{sheets}} sheet(s)',
+    es: 'Compilados {{count}} sprites en {{sheets}} hoja(s)',
+    ru: 'Скомпилировано {{count}} спрайтов в {{sheets}} лист(ов)'
   },
   'status.compileFailed': {
     default: 'Failed to compile sprites: {{err}}',
@@ -2340,11 +2340,11 @@ const translationEntries = {
     ru: 'Экспорт выбранных спрайтов в PNG (все, если не выбрано)'
   },
   'texture.spriteList.importTooltip': {
-    default: 'Import an image as 32×32 tiles (magenta = transparent)',
-    'pt-BR': 'Importar imagem como tiles 32×32 (magenta = transparente)',
-    en: 'Import an image as 32×32 tiles (magenta = transparent)',
-    es: 'Importar imagen como tiles 32×32 (magenta = transparente)',
-    ru: 'Импорт изображения как плиток 32×32 (пурпурный = прозрачный)'
+    default: 'Import an image (32×32, 32×64, 64×32, 64×64; larger sheets are sliced — magenta = transparent)',
+    'pt-BR': 'Importar imagem (32×32, 32×64, 64×32, 64×64; sheets maiores são fatiados — magenta = transparente)',
+    en: 'Import an image (32×32, 32×64, 64×32, 64×64; larger sheets are sliced — magenta = transparent)',
+    es: 'Importar imagen (32×32, 32×64, 64×32, 64×64; las hojas más grandes se dividen — magenta = transparente)',
+    ru: 'Импорт изображения (32×32, 32×64, 64×32, 64×64; большие листы нарезаются — пурпурный = прозрачный)'
   },
   'texture.spriteList.importDialogTitle': {
     default: 'Choose a PNG/BMP to import as tiles',
@@ -2359,6 +2359,132 @@ const translationEntries = {
     en: 'Failed to import image',
     es: 'Error al importar imagen',
     ru: 'Не удалось импортировать изображение'
+  },
+  'status.imageNotDivisible': {
+    default: 'Image {{width}}×{{height}} is not divisible by tile {{tile}}',
+    'pt-BR': 'Imagem {{width}}×{{height}} não é divisível pelo tile {{tile}}',
+    en: 'Image {{width}}×{{height}} is not divisible by tile {{tile}}',
+    es: 'La imagen {{width}}×{{height}} no es divisible por el tile {{tile}}',
+    ru: 'Изображение {{width}}×{{height}} не делится на плитку {{tile}}'
+  },
+  'spriteImportSize.title': {
+    default: 'Choose the sprite tile size',
+    'pt-BR': 'Escolha o tamanho do tile',
+    en: 'Choose the sprite tile size',
+    es: 'Elige el tamaño del tile',
+    ru: 'Выберите размер плитки спрайта'
+  },
+  'spriteImportSize.description': {
+    default: 'The image is {{width}}×{{height}}. Pick the tile size to slice it into:',
+    'pt-BR': 'A imagem é {{width}}×{{height}}. Escolha o tamanho do tile para fatiá-la:',
+    en: 'The image is {{width}}×{{height}}. Pick the tile size to slice it into:',
+    es: 'La imagen es {{width}}×{{height}}. Elige el tamaño del tile para dividirla:',
+    ru: 'Изображение {{width}}×{{height}}. Выберите размер плитки для нарезки:'
+  },
+  'spriteImportSize.tilesCount': {
+    default: '{{count}} tile(s)',
+    'pt-BR': '{{count}} tile(s)',
+    en: '{{count}} tile(s)',
+    es: '{{count}} tile(s)',
+    ru: '{{count}} плиток'
+  },
+  'spriteImportSize.notDivisible': {
+    default: 'does not fit',
+    'pt-BR': 'não encaixa',
+    en: 'does not fit',
+    es: 'no encaja',
+    ru: 'не подходит'
+  },
+  'reorganize.tooltip': {
+    default: 'Reorganize (compact) appearance IDs',
+    'pt-BR': 'Reorganizar (compactar) IDs de appearance',
+    en: 'Reorganize (compact) appearance IDs',
+    es: 'Reorganizar (compactar) IDs de appearance',
+    ru: 'Реорганизовать (сжать) ID appearance'
+  },
+  'reorganize.title': {
+    default: 'Reorganize appearance IDs',
+    'pt-BR': 'Reorganizar IDs de appearance',
+    en: 'Reorganize appearance IDs',
+    es: 'Reorganizar IDs de appearance',
+    ru: 'Реорганизация ID appearance'
+  },
+  'reorganize.description': {
+    default: 'Compact the IDs of each selected category within the range, packing them sequentially from the start and freeing the tail.',
+    'pt-BR': 'Compacta os IDs de cada categoria selecionada dentro do range, deixando-os sequenciais a partir do início e liberando o topo.',
+    en: 'Compact the IDs of each selected category within the range, packing them sequentially from the start and freeing the tail.',
+    es: 'Compacta los IDs de cada categoría seleccionada dentro del rango, dejándolos secuenciales desde el inicio y liberando el final.',
+    ru: 'Сжимает ID каждой выбранной категории в диапазоне, укладывая их последовательно с начала и освобождая конец.'
+  },
+  'reorganize.from': {
+    default: 'from',
+    'pt-BR': 'de',
+    en: 'from',
+    es: 'desde',
+    ru: 'от'
+  },
+  'reorganize.to': {
+    default: 'to',
+    'pt-BR': 'até',
+    en: 'to',
+    es: 'hasta',
+    ru: 'до'
+  },
+  'reorganize.previewButton': {
+    default: 'Preview',
+    'pt-BR': 'Prévia',
+    en: 'Preview',
+    es: 'Vista previa',
+    ru: 'Предпросмотр'
+  },
+  'reorganize.applyButton': {
+    default: 'Reorganize',
+    'pt-BR': 'Reorganizar',
+    en: 'Reorganize',
+    es: 'Reorganizar',
+    ru: 'Реорганизовать'
+  },
+  'reorganize.previewLine': {
+    default: '{{count}} found, {{changed}} moved → frees {{from}}–{{to}}',
+    'pt-BR': '{{count}} encontrados, {{changed}} movidos → libera {{from}}–{{to}}',
+    en: '{{count}} found, {{changed}} moved → frees {{from}}–{{to}}',
+    es: '{{count}} encontrados, {{changed}} movidos → libera {{from}}–{{to}}',
+    ru: 'найдено {{count}}, перемещено {{changed}} → освобождает {{from}}–{{to}}'
+  },
+  'reorganize.warning': {
+    default: 'Renumbering changes client/appearance IDs. Internal .dat references are fixed automatically; an old→new map is exported so you can update server scripts/items.xml/map by hand. Back up first.',
+    'pt-BR': 'Renumerar muda os IDs de cliente/appearance. As referências internas do .dat são corrigidas automaticamente; um mapa old→new é exportado para você atualizar scripts do servidor/items.xml/mapa manualmente. Faça backup antes.',
+    en: 'Renumbering changes client/appearance IDs. Internal .dat references are fixed automatically; an old→new map is exported so you can update server scripts/items.xml/map by hand. Back up first.',
+    es: 'Renumerar cambia los IDs de cliente/appearance. Las referencias internas del .dat se corrigen automáticamente; se exporta un mapa old→new para actualizar scripts del servidor/items.xml/mapa a mano. Haz una copia de seguridad antes.',
+    ru: 'Перенумерация меняет клиентские ID appearance. Внутренние ссылки .dat исправляются автоматически; экспортируется карта old→new для ручного обновления серверных скриптов/items.xml/карты. Сначала сделайте резервную копию.'
+  },
+  'reorganize.confirm': {
+    default: 'Reorganize IDs for {{count}} categor(y/ies)? This rewrites the .dat and is destructive.',
+    'pt-BR': 'Reorganizar IDs de {{count}} categoria(s)? Isso reescreve o .dat e é destrutivo.',
+    en: 'Reorganize IDs for {{count}} categor(y/ies)? This rewrites the .dat and is destructive.',
+    es: '¿Reorganizar IDs de {{count}} categoría(s)? Esto reescribe el .dat y es destructivo.',
+    ru: 'Реорганизовать ID для {{count}} категор(ии)? Это перезапишет .dat и необратимо.'
+  },
+  'reorganize.done': {
+    default: 'Reorganized: {{changed}} IDs moved · {{monsters}} monsters, {{npcs}} NPCs, {{staticdata}} staticdata refs updated',
+    'pt-BR': 'Reorganizado: {{changed}} IDs movidos · {{monsters}} monstros, {{npcs}} NPCs, {{staticdata}} refs de staticdata atualizados',
+    en: 'Reorganized: {{changed}} IDs moved · {{monsters}} monsters, {{npcs}} NPCs, {{staticdata}} staticdata refs updated',
+    es: 'Reorganizado: {{changed}} IDs movidos · {{monsters}} monstruos, {{npcs}} NPCs, {{staticdata}} refs de staticdata actualizados',
+    ru: 'Реорганизовано: перемещено {{changed}} ID · обновлено монстров {{monsters}}, NPC {{npcs}}, ссылок staticdata {{staticdata}}'
+  },
+  'reorganize.exportMapTitle': {
+    default: 'Save the old→new ID map',
+    'pt-BR': 'Salvar o mapa de IDs old→new',
+    en: 'Save the old→new ID map',
+    es: 'Guardar el mapa de IDs old→new',
+    ru: 'Сохранить карту ID old→new'
+  },
+  'status.reorganizeFailed': {
+    default: 'Failed to reorganize IDs: {{err}}',
+    'pt-BR': 'Falha ao reorganizar IDs: {{err}}',
+    en: 'Failed to reorganize IDs: {{err}}',
+    es: 'Error al reorganizar IDs: {{err}}',
+    ru: 'Не удалось реорганизовать ID: {{err}}'
   },
   'texture.spriteList.exportDialogTitle': {
     default: 'Choose a folder to export the sprites',

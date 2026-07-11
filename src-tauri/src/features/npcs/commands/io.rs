@@ -1,12 +1,59 @@
-use crate::core::lua::escape_lua_string;
+use crate::core::fs_util::write_atomic;
+use crate::core::lua::{escape_lua_string, remap_lua_int_field};
 use crate::features::npcs::parsers::lua_parser::LuaNpcParser;
 use crate::features::npcs::types::{Npc, NpcListEntry};
 use anyhow::{Context, Result};
 use serde::Serialize;
 use regex::Regex;
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::command;
+
+#[derive(Serialize)]
+pub struct NpcCascadeResult {
+    pub scanned: usize,
+    pub updated: usize,
+    pub replacements: usize,
+}
+
+/// Rewrite outfit ids (`lookType`/`lookMount`) and shop `clientId`s across every
+/// NPC `.lua` under `npcs_path`. `outfit_remap` applies to the outfit fields and
+/// `object_remap` to `clientId`. Surgical text edit (preserves custom Lua such as
+/// dynamic shop builders); each changed file is backed up to `<file>.bak`.
+#[command]
+pub async fn apply_id_remap_to_npcs(npcs_path: String, outfit_remap: Vec<(u32, u32)>, object_remap: Vec<(u32, u32)>) -> Result<NpcCascadeResult, String> {
+    remap_npc_ids(npcs_path, outfit_remap, object_remap).map_err(|e| format!("Failed to remap npc ids: {}", e))
+}
+
+fn remap_npc_ids(npcs_path: String, outfit_remap: Vec<(u32, u32)>, object_remap: Vec<(u32, u32)>) -> Result<NpcCascadeResult> {
+    let mut result = NpcCascadeResult {
+        scanned: 0,
+        updated: 0,
+        replacements: 0,
+    };
+    let outfit_map: HashMap<u32, u32> = outfit_remap.into_iter().collect();
+    let object_map: HashMap<u32, u32> = object_remap.into_iter().collect();
+    if outfit_map.is_empty() && object_map.is_empty() {
+        return Ok(result);
+    }
+
+    let base = PathBuf::from(&npcs_path);
+    for entry in list_npcs_recursive(Path::new(&npcs_path), &base)? {
+        result.scanned += 1;
+        let text = fs::read_to_string(&entry.file_path).with_context(|| format!("read {}", entry.file_path))?;
+        let (t1, c1) = remap_lua_int_field(&text, "lookType", &outfit_map);
+        let (t2, c2) = remap_lua_int_field(&t1, "lookMount", &outfit_map);
+        let (t3, c3) = remap_lua_int_field(&t2, "clientId", &object_map);
+        if c1 + c2 + c3 > 0 {
+            let _ = fs::copy(&entry.file_path, format!("{}.bak", entry.file_path));
+            write_atomic(Path::new(&entry.file_path), t3.as_bytes())?;
+            result.updated += 1;
+            result.replacements += c1 + c2 + c3;
+        }
+    }
+    Ok(result)
+}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]

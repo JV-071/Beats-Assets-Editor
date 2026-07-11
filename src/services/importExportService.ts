@@ -9,7 +9,8 @@ import { openImportModal, type ImportContext } from "../stores/importExportState
 import { openConfirmModal } from "../stores/confirmState.svelte";
 import { openPromptModal } from "../stores/promptState.svelte";
 import { clearAssetSelection, removeAssetSelection } from "../stores/selectionState.svelte";
-import { refreshImportedSpriteCount } from "../stores/importedSpritesState.svelte";
+import { importedSpritesState, refreshImportedSpriteCount } from "../stores/importedSpritesState.svelte";
+import { openSpriteImportSizeModal, isStandardTileSize } from "../stores/spriteImportSizeState.svelte";
 
 interface AssetTarget {
   category: string;
@@ -21,18 +22,35 @@ interface ImportBatchResult {
   skipped: number[];
 }
 
+interface CompiledSheet {
+  file: string;
+  first_sprite_id: number;
+  last_sprite_id: number;
+  sprite_type: number;
+  count: number;
+}
+
+interface CompileResult {
+  sprites_compiled: number;
+  sheets: CompiledSheet[];
+  remap: [number, number][];
+}
+
 export async function handleExport(category: string, id: number): Promise<void> {
   try {
-    const defaultName = `appearance-${id}.json`;
+    // Default to AEC: it embeds the sprite bytes (field 7), so the exported
+    // asset actually carries its images and can be re-imported (here or in the
+    // C# Assets-Editor). JSON stays available but is metadata-only.
+    const defaultName = `appearance-${id}.aec`;
     const destination = await save({
       defaultPath: defaultName,
-      filters: [{ name: "Appearance", extensions: ["json", "aec"] }],
+      filters: [{ name: "Appearance", extensions: ["aec", "json"] }],
     });
 
     if (!destination) return;
 
     const lower = destination.toLowerCase();
-    const useAec = lower.endsWith('.aec');
+    const useAec = !lower.endsWith('.json');
     const command = useAec ? COMMANDS.EXPORT_APPEARANCE_TO_AEC : COMMANDS.EXPORT_APPEARANCE_TO_JSON;
     await invoke(command, { category, id, path: destination });
     showStatus(translate('status.appearanceExported', { id }), 'success');
@@ -47,6 +65,41 @@ export async function exportQueueToFolder(
   format: "aec" | "json",
 ): Promise<boolean> {
   if (items.length === 0) return false;
+
+  // AEC: one self-contained bundle carrying every selected appearance plus its
+  // sprites (field 7). "Save as" a single file, C# Assets-Editor compatible.
+  if (format === "aec") {
+    const destination = await save({
+      defaultPath: "appearances.aec",
+      filters: [{ name: "Appearance Bundle", extensions: ["aec"] }],
+      title: translate("export.queue.dialogTitle"),
+    });
+    if (!destination) return false;
+
+    try {
+      await invoke(COMMANDS.EXPORT_APPEARANCES_TO_AEC_BUNDLE, {
+        items: items.map((i) => ({ category: i.category, id: i.id })),
+        path: destination,
+      });
+      showStatus(
+        translate("status.queueExported", {
+          ok: String(items.length),
+          total: String(items.length),
+        }),
+        "success",
+      );
+      return true;
+    } catch (err) {
+      console.error("Failed to export AEC bundle", err);
+      showStatus(
+        translate("status.queueExported", { ok: "0", total: String(items.length) }),
+        "error",
+      );
+      return false;
+    }
+  }
+
+  // JSON: metadata-only, one file per item into a chosen folder (no sprites).
   const dir = await open({
     directory: true,
     multiple: false,
@@ -54,18 +107,12 @@ export async function exportQueueToFolder(
   });
   if (!dir || typeof dir !== "string") return false;
 
-  const ext = format === "aec" ? "aec" : "json";
-  const command =
-    format === "aec"
-      ? COMMANDS.EXPORT_APPEARANCE_TO_AEC
-      : COMMANDS.EXPORT_APPEARANCE_TO_JSON;
-
   let ok = 0;
   const failed: number[] = [];
   for (const item of items) {
     try {
-      const path = `${dir}/${item.category}-${item.id}.${ext}`;
-      await invoke(command, { category: item.category, id: item.id, path });
+      const path = `${dir}/${item.category}-${item.id}.json`;
+      await invoke(COMMANDS.EXPORT_APPEARANCE_TO_JSON, { category: item.category, id: item.id, path });
       ok++;
     } catch (err) {
       console.error("Failed to export queued item", item, err);
@@ -83,10 +130,35 @@ export async function exportQueueToFolder(
 }
 
 /**
- * F2 — compiles all imported sprites into the client's catalog (DESTRUCTIVE:
- * rewrites catalog-content.json and adds a .cwm sheet, backing the catalog up to
- * .bak). Reloads the sprite catalog and saves the appearances so the remapped
- * sprite references persist. Confirmed first because it overwrites game assets.
+ * Bake the backend's pending imported sprites into the client's catalog
+ * (DESTRUCTIVE: writes a .cwm sheet + updates catalog-content.json, backing it
+ * up to .bak) and reload the sprite catalog so the new sheet is live and the
+ * remapped appearance sprite references resolve. The caller is responsible for
+ * saving the appearances afterwards. Throws if the tibia path is unknown.
+ */
+async function persistImportedSpritesToCatalog(): Promise<CompileResult> {
+  const tibiaPath = await invoke<string | null>(COMMANDS.GET_TIBIA_BASE_PATH);
+  if (!tibiaPath) {
+    throw new Error(translate("status.compileNoPath"));
+  }
+  const assetsDir = await join(tibiaPath, "assets");
+  const catalogPath = await join(assetsDir, "catalog-content.json");
+
+  const result = await invoke<CompileResult>(
+    COMMANDS.COMPILE_IMPORTED_SPRITES,
+    { assetsDir, catalogPath },
+  );
+  // Reload the catalog so the new sheet is visible to the sprite loader.
+  await invoke(COMMANDS.LOAD_SPRITES_CATALOG, { catalogPath, assetsDir });
+  // The backend cleared the imported buffer; sync the badge/button visibility.
+  await refreshImportedSpriteCount();
+  return result;
+}
+
+/**
+ * F2 — compiles all imported sprites into the client's catalog and saves the
+ * appearances so the remapped sprite references persist. Confirmed first
+ * because it overwrites game assets.
  */
 export async function handleCompileImportedSprites(): Promise<void> {
   const confirmed = await openConfirmModal(
@@ -96,30 +168,14 @@ export async function handleCompileImportedSprites(): Promise<void> {
   if (!confirmed) return;
 
   try {
-    const tibiaPath = await invoke<string | null>(COMMANDS.GET_TIBIA_BASE_PATH);
-    if (!tibiaPath) {
-      showStatus(translate("status.compileNoPath"), 'error');
-      return;
-    }
-    const assetsDir = await join(tibiaPath, "assets");
-    const catalogPath = await join(assetsDir, "catalog-content.json");
-
-    const result = await invoke<{ sprites_compiled: number; sheet_file: string }>(
-      COMMANDS.COMPILE_IMPORTED_SPRITES,
-      { assetsDir, catalogPath },
-    );
-
-    // Reload the catalog so the new sheet is visible, then persist remapped refs.
-    await invoke(COMMANDS.LOAD_SPRITES_CATALOG, { catalogPath, assetsDir });
+    const result = await persistImportedSpritesToCatalog();
     await invoke(COMMANDS.SAVE_APPEARANCES_FILE);
     await loadAssetsData();
-    // The backend cleared the imported buffer; sync the badge/button visibility.
-    await refreshImportedSpriteCount();
 
     showStatus(
       translate("status.compileDone", {
         count: String(result.sprites_compiled),
-        file: result.sheet_file,
+        sheets: String(result.sheets.length),
       }),
       "success",
     );
@@ -137,10 +193,43 @@ export async function handleImportImageTiles(): Promise<number[] | null> {
   });
   if (!file || typeof file !== "string") return null;
   try {
+    // Decide the tile size: if the image already is one of the four standard
+    // sprite sizes, import it as a single sprite; otherwise let the user pick a
+    // tile size to slice the (larger) sheet into.
+    const { width, height } = await invoke<{ width: number; height: number }>(
+      COMMANDS.GET_IMAGE_DIMENSIONS,
+      { filePath: file },
+    );
+
+    let tileWidth: number;
+    let tileHeight: number;
+    if (isStandardTileSize(width, height)) {
+      tileWidth = width;
+      tileHeight = height;
+    } else {
+      const size = await openSpriteImportSizeModal(width, height);
+      if (size === null) return null; // cancelled
+      tileWidth = size.width;
+      tileHeight = size.height;
+    }
+
+    // Guard against silently dropping edge pixels (backend truncates cols/rows).
+    if (width % tileWidth !== 0 || height % tileHeight !== 0) {
+      showStatus(
+        translate("status.imageNotDivisible", {
+          width: String(width),
+          height: String(height),
+          tile: `${tileWidth}×${tileHeight}`,
+        }),
+        "error",
+      );
+      return null;
+    }
+
     const ids = await invoke<number[]>(COMMANDS.IMPORT_IMAGE_AS_TILES, {
       filePath: file,
-      tileWidth: 32,
-      tileHeight: 32,
+      tileWidth,
+      tileHeight,
       chromaKeyEnabled: true,
       chromaKeyColor: "#FF00FF",
     });
@@ -206,6 +295,15 @@ export async function handleImport(): Promise<void> {
     const skippedCount = result.skipped.length;
 
     if (importedCount > 0) {
+      // The import may have pulled sprite bytes into the backend's pending
+      // buffer (from AEC field 7 or the legacy .sprites companion). Bake them
+      // into the catalog BEFORE saving, otherwise the appearances would persist
+      // references to transient in-memory sprite IDs that vanish on reload —
+      // the exact reason imports used to "lose" their sprites.
+      await refreshImportedSpriteCount();
+      if (importedSpritesState.count > 0) {
+        await persistImportedSpritesToCatalog();
+      }
       await invoke(COMMANDS.SAVE_APPEARANCES_FILE);
       await loadAssetsData();
     }

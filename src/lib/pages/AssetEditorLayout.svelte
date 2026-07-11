@@ -9,6 +9,7 @@
   import QmTranslationEditor from "../components/QmTranslationEditor.svelte";
   import AssetDetailsModal from "../components/AssetDetailsModal.svelte";
   import ImportStartIdModal from "../components/ImportStartIdModal.svelte";
+  import SpriteImportSizeModal from "../components/SpriteImportSizeModal.svelte";
   import SpriteLibraryDrawer from "../components/SpriteLibraryDrawer.svelte";
   import ProficiencyEditorPage from "./ProficiencyEditorPage.svelte";
   import DatMergePage from "./DatMergePage.svelte";
@@ -35,4 +36,5 @@
 
 <AssetDetailsModal />
 <ImportStartIdModal />
+<SpriteImportSizeModal />
 <SpriteLibraryDrawer />

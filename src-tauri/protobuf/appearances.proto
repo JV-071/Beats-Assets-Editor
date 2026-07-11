@@ -61,6 +61,12 @@ message Appearance {
   optional AppearanceFlags flags = 3;
   optional bytes name = 4;
   optional bytes description = 5;
+  // Custom AEC interop field (matches the C# Assets-Editor): one PNG blob per
+  // sprite, ordered to match the flattened frame_group[].sprite_info.sprite_id
+  // list. Only populated inside `.aec` export bundles; always empty in the real
+  // game catalog (an empty `repeated` does not serialize, so the on-disk
+  // appearances.dat stays byte-identical).
+  repeated bytes sprite_data = 7;
 }
 
 message AppearanceFlags {

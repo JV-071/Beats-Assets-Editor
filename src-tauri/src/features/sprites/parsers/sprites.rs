@@ -64,6 +64,32 @@ pub struct SpriteCatalogEntry {
     pub area: Option<u32>,
 }
 
+/// Pixel dimensions `(width, height)` of a catalog `spritetype` code.
+/// The Tibia catalog encodes only four sizes: `0`→32×32, `1`→32×64, `2`→64×32,
+/// `3`(and any other value)→64×64. Shared by the loader and the sprite compiler
+/// so the read and write paths can never drift.
+pub fn size_for_sprite_type(sprite_type: u32) -> (u32, u32) {
+    match sprite_type {
+        0 => (32, 32),
+        1 => (32, 64),
+        2 => (64, 32),
+        _ => (64, 64),
+    }
+}
+
+/// Inverse of [`size_for_sprite_type`]: the catalog `spritetype` code for a given
+/// tile size, or `None` if the size is not one of the four representable sprite
+/// dimensions (32×32, 32×64, 64×32, 64×64).
+pub fn sprite_type_for_size(width: u32, height: u32) -> Option<u32> {
+    match (width, height) {
+        (32, 32) => Some(0),
+        (32, 64) => Some(1),
+        (64, 32) => Some(2),
+        (64, 64) => Some(3),
+        _ => None,
+    }
+}
+
 /// Sprite catalog that maps sprite IDs to LZMA files
 #[derive(Debug)]
 pub struct SpriteCatalog {
@@ -198,12 +224,7 @@ impl CatalogBackend {
         }
 
         let (tile_width, tile_height) = if let Some(t) = entry.sprite_type {
-            match t {
-                0 => (32, 32),
-                1 => (32, 64),
-                2 => (64, 32),
-                _ => (64, 64),
-            }
+            size_for_sprite_type(t)
         } else {
             let tile_area = (width * height) / total_count; // 1024 => 32x32, 2048 => 32x64/64x32, 4096 => 64x64
             match tile_area {

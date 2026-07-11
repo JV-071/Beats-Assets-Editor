@@ -99,7 +99,8 @@ pub fn decompress_zlib(data: &[u8]) -> Result<Vec<u8>, String> {
 
 /// Decompress a zstd frame (Qt resource compression, Qt >= 5.13).
 pub fn decompress_zstd(data: &[u8]) -> Result<Vec<u8>, String> {
-    let mut decoder = ruzstd::StreamingDecoder::new(data).map_err(|e| format!("zstd init: {}", e))?;
+    // ruzstd 0.8 moved StreamingDecoder under the `decoding` module.
+    let mut decoder = ruzstd::decoding::StreamingDecoder::new(data).map_err(|e| format!("zstd init: {}", e))?;
     let mut out = Vec::new();
     decoder.read_to_end(&mut out).map_err(|e| format!("zstd read: {}", e))?;
     Ok(out)
