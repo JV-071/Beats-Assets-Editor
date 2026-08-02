@@ -221,6 +221,20 @@
       }
 
       // Complex flags
+      // `bank` is diffed instead of always sent: the form pre-fills every
+      // complex flag, so sending it unconditionally would stamp a bank flag
+      // onto every saved item. An empty field clears the flag (backend takes
+      // an Option and drops it on None).
+      const normNum = (v: unknown): number | undefined =>
+        v === null || v === undefined || v === "" ? undefined : Number(v);
+      const originalWaypoints = normNum(originalFlags.bank?.waypoints);
+      const updatedWaypoints = normNum(updatedFlags.bank?.waypoints);
+      if (originalWaypoints !== updatedWaypoints)
+        await invoke("update_appearance_bank", {
+          category,
+          id,
+          waypoints: updatedWaypoints,
+        });
       if (updatedFlags.light)
         await invoke("update_appearance_light", {
           category,

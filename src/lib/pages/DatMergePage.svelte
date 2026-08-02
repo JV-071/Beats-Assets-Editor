@@ -42,13 +42,17 @@
 
   interface StaticDataMergePreview {
     creaturesToAdd: number; bossesToAdd: number; housesToAdd: number;
-    questsToAdd: number; titlesToAdd: number; mapHousesToAdd: number;
+    questsToAdd: number; achievementsToAdd: number; monsterClassesToAdd: number;
+    mapHousesToAdd: number;
     staticdataFile: string; staticmapdataFile: string | null;
+    /** "old" | "new" — schema both files use. */
+    schema: string;
   }
 
   interface StaticDataMergeResult {
     creaturesAdded: number; bossesAdded: number; housesAdded: number;
-    questsAdded: number; titlesAdded: number; mapHousesAdded: number;
+    questsAdded: number; achievementsAdded: number; monsterClassesAdded: number;
+    mapHousesAdded: number;
   }
 
   // ── State ──────────────────────────────────────────────────────────────────
@@ -59,7 +63,7 @@
   let folderStats   = $state<MergeFolderStats | null>(null);
 
   let thresholds   = $state({ objects: 60000, outfits: 5000, effects: 1000, missiles: 1000 });
-  let sdThresholds = $state({ creatures: 1000, bosses: 6000, houses: 1000, quests: 1000, titles: 1000, mapHouses: 1000 });
+  let sdThresholds = $state({ creatures: 1000, bosses: 6000, houses: 1000, quests: 1000, achievements: 1000, monsterClasses: 1000, mapHouses: 1000 });
 
   let preview        = $state<MergePreview | null>(null);
   let mergeResult    = $state<CategoryStats | null>(null);
@@ -205,7 +209,8 @@
       sdPreview = await invoke<StaticDataMergePreview>(COMMANDS.GET_STATICDATA_MERGE_PREVIEW, {
         thresholds: { creatures: sdThresholds.creatures, bosses: sdThresholds.bosses,
           houses: sdThresholds.houses, quests: sdThresholds.quests,
-          titles: sdThresholds.titles, mapHouses: sdThresholds.mapHouses },
+          achievements: sdThresholds.achievements, monsterClasses: sdThresholds.monsterClasses,
+          mapHouses: sdThresholds.mapHouses },
       });
     } catch (e) { showStatus(`Erro preview staticdata: ${e}`, "error"); }
     finally { loadingSdPreview = false; }
@@ -218,7 +223,8 @@
       sdResult = await invoke<StaticDataMergeResult>(COMMANDS.EXECUTE_STATICDATA_MERGE, {
         thresholds: { creatures: sdThresholds.creatures, bosses: sdThresholds.bosses,
           houses: sdThresholds.houses, quests: sdThresholds.quests,
-          titles: sdThresholds.titles, mapHouses: sdThresholds.mapHouses },
+          achievements: sdThresholds.achievements, monsterClasses: sdThresholds.monsterClasses,
+          mapHouses: sdThresholds.mapHouses },
       });
       sdMerged = true;
       showStatus("Static data preparado", "success");
@@ -230,7 +236,8 @@
 
   function total(s: CategoryStats) { return s.objects + s.outfits + s.effects + s.missiles; }
   function sdTotal(p: StaticDataMergePreview) {
-    return p.creaturesToAdd + p.bossesToAdd + p.housesToAdd + p.questsToAdd + p.titlesToAdd + p.mapHousesToAdd;
+    return p.creaturesToAdd + p.bossesToAdd + p.housesToAdd + p.questsToAdd + p.achievementsToAdd
+      + p.monsterClassesToAdd + p.mapHousesToAdd;
   }
 </script>
 
@@ -460,7 +467,7 @@
           <div class="tab-panel">
             <div class="config-section">
               <span class="config-label">IDs custom ≥</span>
-              {#each [["Creatures", "creatures"], ["Bosses", "bosses"], ["Houses", "houses"], ["Quests", "quests"], ["Titles", "titles"], ["Map Houses", "mapHouses"]] as [label, key]}
+              {#each [["Creatures", "creatures"], ["Bosses", "bosses"], ["Houses", "houses"], ["Quests", "quests"], ["Achievements", "achievements"], ["Monster Classes", "monsterClasses"], ["Map Houses", "mapHouses"]] as [label, key]}
                 <label class="config-field">
                   <span>{label}</span>
                   <input type="number" bind:value={(sdThresholds as any)[key]} min="1" />
@@ -485,7 +492,8 @@
                     ["Bosses", sdPreview.bossesToAdd],
                     ["Houses", sdPreview.housesToAdd],
                     ["Quests", sdPreview.questsToAdd],
-                    ["Titles", sdPreview.titlesToAdd],
+                    ["Achievements", sdPreview.achievementsToAdd],
+                    ["Monster Classes", sdPreview.monsterClassesToAdd],
                     ...(sdPreview.staticmapdataFile ? [["Map Houses", sdPreview.mapHousesToAdd]] : [])
                   ] as [label, count]}
                     <tr>
@@ -509,7 +517,8 @@
             {#if sdMerged && sdResult}
               <div class="result-banner success">
                 ✅ {sdResult.creaturesAdded + sdResult.bossesAdded + sdResult.housesAdded
-                  + sdResult.questsAdded + sdResult.titlesAdded + sdResult.mapHousesAdded} itens preparados em memoria
+                  + sdResult.questsAdded + sdResult.achievementsAdded + sdResult.monsterClassesAdded
+                  + sdResult.mapHousesAdded} itens preparados em memoria
               </div>
             {/if}
           </div>
@@ -534,7 +543,7 @@
               {#if folderStats?.staticdataFile}
                 <div class="summary-item">
                   <span class="summary-label">Static Data</span>
-                  <span class="summary-value {sdMerged ? 'ok' : ''}">{sdMerged && sdResult ? (sdResult.creaturesAdded + sdResult.bossesAdded + sdResult.housesAdded + sdResult.questsAdded + sdResult.titlesAdded + sdResult.mapHousesAdded) + ' itens' : 'Nao executado'}</span>
+                  <span class="summary-value {sdMerged ? 'ok' : ''}">{sdMerged && sdResult ? (sdResult.creaturesAdded + sdResult.bossesAdded + sdResult.housesAdded + sdResult.questsAdded + sdResult.achievementsAdded + sdResult.monsterClassesAdded + sdResult.mapHousesAdded) + ' itens' : 'Nao executado'}</span>
                 </div>
               {/if}
             </div>

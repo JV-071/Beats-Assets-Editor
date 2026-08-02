@@ -169,9 +169,9 @@ pub fn run() {
             features::staticdata::commands::io::update_staticdata_creature,
             features::staticdata::commands::io::update_staticdata_boss,
             features::staticdata::commands::io::update_staticdata_quest,
-            features::staticdata::commands::io::update_staticdata_title,
+            features::staticdata::commands::io::update_staticdata_achievement,
             features::staticdata::commands::io::get_staticdata_creatures,
-            features::staticdata::commands::io::get_staticdata_titles,
+            features::staticdata::commands::io::get_staticdata_achievements,
             features::staticdata::commands::io::get_staticdata_houses,
             features::staticdata::commands::io::get_staticdata_bosses,
             features::staticdata::commands::io::get_staticdata_quests,
@@ -256,6 +256,12 @@ pub fn run() {
             features::rcc::exe_commands::exe_apply_resource,
             features::rcc::exe_commands::exe_replace_resource_from_file,
             features::rcc::exe_commands::exe_apply_spell_to_disk,
+            features::client_config::commands::urls::get_client_urls,
+            features::client_config::commands::urls::save_client_urls,
+            features::client_config::commands::battleye::get_battleye_status,
+            features::client_config::commands::battleye::set_battleye_enabled,
+            features::client_config::commands::rsa::get_rsa_modulus,
+            features::client_config::commands::rsa::set_rsa_modulus,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

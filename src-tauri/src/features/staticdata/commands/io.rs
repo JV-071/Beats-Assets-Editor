@@ -1,4 +1,4 @@
-use crate::features::staticdata::parsers::{doc_statistics, load_staticdata, load_staticdata_doc, save_staticdata_doc, StaticDataDoc, StaticDataStats};
+use crate::features::staticdata::parsers::{doc_statistics, load_staticdata_doc, save_staticdata_doc, StaticDataDoc, StaticDataStats};
 use crate::state::AppState;
 use std::path::PathBuf;
 use tauri::State;
@@ -8,8 +8,7 @@ use tauri::State;
 // and the newer client schema. Because the per-category message shapes share
 // field names across schemas, getters return `serde_json::Value` (identical JSON
 // either way) and updaters accept `serde_json::Value` (deserialized into the
-// loaded schema's type). `state.staticdata` keeps a legacy decode purely so the
-// DAT-merge feature keeps working unchanged.
+// loaded schema's type).
 
 #[tauri::command]
 pub fn load_staticdata_file(path: String, state: State<'_, AppState>) -> Result<StaticDataStats, String> {
@@ -21,11 +20,6 @@ pub fn load_staticdata_file(path: String, state: State<'_, AppState>) -> Result<
     let doc = load_staticdata_doc(&path_buf).map_err(|e| format!("Failed to parse staticdata: {}", e))?;
     let stats = doc_statistics(&doc);
 
-    // Best-effort legacy decode for the DAT-merge feature (it operates on the
-    // legacy schema). Never fatal — the browser uses the versioned doc.
-    if let Ok(legacy) = load_staticdata(&path_buf) {
-        *state.staticdata.write() = Some(legacy);
-    }
     *state.staticdata_doc.write() = Some(doc);
     Ok(stats)
 }
@@ -62,10 +56,10 @@ macro_rules! getter {
     };
 }
 
-// Legacy category labels map to the new schema's equivalents:
-//   creatures→monsters, titles→achievements, houses, bosses, quests.
+// Category names map across schemas: creatures→monsters; achievements is
+// legacy field 2 / new field 3; houses, bosses and quests keep their names.
 getter!(get_staticdata_creatures, monsters, creatures);
-getter!(get_staticdata_titles, achievements, titles);
+getter!(get_staticdata_achievements, achievements, achievements);
 getter!(get_staticdata_houses, houses, houses);
 getter!(get_staticdata_bosses, bosses, bosses);
 getter!(get_staticdata_quests, quests, quests);
@@ -178,7 +172,7 @@ pub fn remove_staticdata_item(category: String, id: u32, state: State<'_, AppSta
             "creatures" => n.monsters.retain(|x| x.id != Some(id)),
             "bosses" => n.bosses.retain(|x| x.id != Some(id)),
             "quests" => n.quests.retain(|x| x.id != Some(id)),
-            "titles" => n.achievements.retain(|x| x.id != Some(id)),
+            "achievements" => n.achievements.retain(|x| x.id != Some(id)),
             "monster_classes" => n.monster_classes.retain(|x| x.id != Some(id)),
             _ => return Err(format!("Category {} is not supported for removal", category)),
         },
@@ -186,7 +180,7 @@ pub fn remove_staticdata_item(category: String, id: u32, state: State<'_, AppSta
             "creatures" => o.creatures.retain(|x| x.id != Some(id)),
             "bosses" => o.bosses.retain(|x| x.id != Some(id)),
             "quests" => o.quests.retain(|x| x.id != Some(id)),
-            "titles" => o.titles.retain(|x| x.id != Some(id)),
+            "achievements" => o.achievements.retain(|x| x.id != Some(id)),
             _ => return Err(format!("Category {} is not supported for removal", category)),
         },
     }
@@ -224,12 +218,12 @@ pub fn update_staticdata_quest(item: serde_json::Value, state: State<'_, AppStat
 }
 
 #[tauri::command]
-pub fn update_staticdata_title(item: serde_json::Value, state: State<'_, AppState>) -> Result<(), String> {
+pub fn update_staticdata_achievement(item: serde_json::Value, state: State<'_, AppState>) -> Result<(), String> {
     let mut lock = state.staticdata_doc.write();
     let doc = lock.as_mut().ok_or("No staticdata loaded")?;
     match doc {
         StaticDataDoc::New(n) => upsert(&mut n.achievements, item, |x| x.id),
-        StaticDataDoc::Old(o) => upsert(&mut o.titles, item, |x| x.id),
+        StaticDataDoc::Old(o) => upsert(&mut o.achievements, item, |x| x.id),
     }
 }
 

@@ -9,7 +9,7 @@
   import { COMMANDS } from "../../commands";
   import type {
     StaticCreature,
-    StaticTitle,
+    StaticAchievement,
     StaticHouse,
     StaticBoss,
     StaticQuest,
@@ -36,7 +36,7 @@
 
   // Derived arrays do Store persistente
   let creatures = $derived(assetsState.creatures);
-  let titles = $derived(assetsState.titles);
+  let achievements = $derived(assetsState.achievements);
   let houses = $derived(assetsState.houses);
   let bosses = $derived(assetsState.bosses);
   let quests = $derived(assetsState.quests);
@@ -63,9 +63,9 @@
             .map((c) => c.outfit?.looktype)
             .filter((id) => id != null) as number[],
         );
-      } else if (type === "titles" && assetsState.titles.length === 0) {
-        assetsState.titles = await invoke<StaticTitle[]>(
-          COMMANDS.GET_STATICDATA_TITLES,
+      } else if (type === "achievements" && assetsState.achievements.length === 0) {
+        assetsState.achievements = await invoke<StaticAchievement[]>(
+          COMMANDS.GET_STATICDATA_ACHIEVEMENTS,
         );
       } else if (type === "houses" && assetsState.houses.length === 0) {
         assetsState.houses = await invoke<StaticHouse[]>(
@@ -144,9 +144,9 @@
       c.name.toLowerCase().includes(searchQuery.toLowerCase()),
     ),
   );
-  let filteredTitles = $derived(
-    titles.filter((t) =>
-      t.name.toLowerCase().includes(searchQuery.toLowerCase()),
+  let filteredAchievements = $derived(
+    achievements.filter((a) =>
+      a.name.toLowerCase().includes(searchQuery.toLowerCase()),
     ),
   );
   let filteredHouses = $derived(
@@ -180,8 +180,8 @@
       ? filteredCreatures
       : currentDataType === "bosses"
         ? filteredBosses
-        : currentDataType === "titles"
-          ? filteredTitles
+        : currentDataType === "achievements"
+          ? filteredAchievements
           : currentDataType === "quests"
             ? filteredQuests
             : currentDataType === "houses"
@@ -209,7 +209,7 @@
         return "👑";
       case "quests":
         return "📜";
-      case "titles":
+      case "achievements":
         return "🏅";
       case "monster_classes":
         return "🧬";
@@ -259,8 +259,8 @@
       case "quests":
         currentArr = quests;
         break;
-      case "titles":
-        currentArr = titles;
+      case "achievements":
+        currentArr = achievements;
         break;
       case "monster_classes":
         currentArr = monsterClasses;
@@ -283,8 +283,8 @@
       case "quests":
         command = COMMANDS.UPDATE_STATICDATA_QUEST;
         break;
-      case "titles":
-        command = COMMANDS.UPDATE_STATICDATA_TITLE;
+      case "achievements":
+        command = COMMANDS.UPDATE_STATICDATA_ACHIEVEMENT;
         break;
       case "monster_classes":
         command = COMMANDS.UPDATE_STATICDATA_MONSTER_CLASS;
@@ -326,8 +326,8 @@
         case "quests":
           newList = quests.filter((i) => i.id !== id);
           break;
-        case "titles":
-          newList = titles.filter((i) => i.id !== id);
+        case "achievements":
+          newList = achievements.filter((i) => i.id !== id);
           break;
         case "monster_classes":
           newList = monsterClasses.filter((i) => i.id !== id);
@@ -375,7 +375,7 @@
         {#if currentDataType === "creatures"}🐉{/if}
         {#if currentDataType === "bosses"}👑{/if}
         {#if currentDataType === "quests"}📜{/if}
-        {#if currentDataType === "titles"}🏅{/if}
+        {#if currentDataType === "achievements"}🏅{/if}
         {#if currentDataType === "monster_classes"}🧬{/if}
         {#if currentDataType === "houses"}🏘️{/if}
         {#if currentDataType === "map_houses"}🗺️{/if}
@@ -386,7 +386,7 @@
         {#if currentDataType === "creatures"}Creatures{/if}
         {#if currentDataType === "bosses"}Bosses{/if}
         {#if currentDataType === "quests"}Quests{/if}
-        {#if currentDataType === "titles"}Titles{/if}
+        {#if currentDataType === "achievements"}Achievements{/if}
         {#if currentDataType === "monster_classes"}Monster Classes{/if}
         {#if currentDataType === "houses"}Houses{/if}
         {#if currentDataType === "map_houses"}Map Houses{/if}

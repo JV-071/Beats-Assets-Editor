@@ -2,6 +2,7 @@
 // Organized by feature domain
 
 pub mod appearances;
+pub mod client_config;
 pub mod dat_merge;
 pub mod minimap;
 pub mod monsters;

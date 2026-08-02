@@ -13,6 +13,7 @@
   import SpriteLibraryDrawer from "../components/SpriteLibraryDrawer.svelte";
   import ProficiencyEditorPage from "./ProficiencyEditorPage.svelte";
   import DatMergePage from "./DatMergePage.svelte";
+  import ClientConfigBrowser from "../components/ClientConfigBrowser.svelte";
 </script>
 
 {#if assetsState.viewMode === "categories"}
@@ -32,6 +33,8 @@
   <ProficiencyEditorPage />
 {:else if assetsState.viewMode === "dat-merge"}
   <DatMergePage />
+{:else if assetsState.viewMode === "client-config"}
+  <ClientConfigBrowser />
 {/if}
 
 <AssetDetailsModal />

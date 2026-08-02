@@ -7,7 +7,7 @@ Um editor moderno e profissional de assets do Tibia 15.x construído com **Rust 
 ![Tauri](https://img.shields.io/badge/tauri-2.9+-blue)
 ![Svelte](https://img.shields.io/badge/svelte-5-ff3e00)
 ![Vite](https://img.shields.io/badge/vite-6.0+-purple)
-![TypeScript](https://img.shields.io/badge/typescript-5.6-blue)
+![TypeScript](https://img.shields.io/badge/typescript-7.0-blue)
 ![Performance](https://img.shields.io/badge/performance-9.5%2F10-brightgreen)
 ![Backend](https://img.shields.io/badge/backend-9.8%2F10-brightgreen)
 ![Optimized](https://img.shields.io/badge/optimized-50x%20faster-success)
@@ -76,7 +76,7 @@ Um editor moderno e profissional de assets do Tibia 15.x construído com **Rust 
 - `@tauri-apps/plugin-dialog`: ^2
 - `@tauri-apps/plugin-opener`: ^2
 - `vite`: ^6.0.3
-- `typescript`: ~5.6.2
+- `typescript`: ^7.0.2
 
 **Backend (Rust):**
 - `tauri`: 2 (com plugins dialog e opener)

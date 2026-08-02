@@ -78,7 +78,7 @@
         return "👑";
       case "quests":
         return "📜";
-      case "titles":
+      case "achievements":
         return "🏅";
       case "monster_classes":
         return "🧬";
@@ -294,12 +294,12 @@
         {/if}
 
         <!-- ======================= -->
-        <!-- TITLES                  -->
+        <!-- ACHIEVEMENTS            -->
         <!-- ======================= -->
-        {#if dataType === "titles"}
+        {#if dataType === "achievements"}
           <div class="detail-section">
             <h3 class="section-title">
-              {translate("modal.static.info.titleProfile")}
+              {translate("modal.static.info.achievementProfile")}
             </h3>
             <div class="info-grid">
               <div class="info-item">

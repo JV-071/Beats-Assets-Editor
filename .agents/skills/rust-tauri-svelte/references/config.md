@@ -96,7 +96,7 @@ Key v1 → v2 config differences:
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
-    "typescript": "~5.6",
+    "typescript": "^7.0",
     "vite": "^6"
   }
 }

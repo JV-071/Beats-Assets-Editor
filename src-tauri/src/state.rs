@@ -10,7 +10,6 @@ use std::sync::Arc;
 use crate::core::cache::LRUCache;
 use crate::features::appearances::{Appearances, CompleteFlags};
 use crate::features::sprites::parsers::SpriteLoader;
-use crate::features::staticdata::StaticData;
 use crate::features::staticdata::parsers::StaticDataDoc;
 use crate::features::staticmapdata::StaticMapData;
 
@@ -27,10 +26,8 @@ pub struct AppState {
     pub tibia_path: Mutex<Option<PathBuf>>,
 
     // StaticData
-    // `staticdata` keeps the legacy-schema decode for the DAT-merge feature.
     // `staticdata_doc` holds the version-detected document (legacy OR new client
-    // schema) that the staticdata browser reads/edits/saves.
-    pub staticdata: RwLock<Option<StaticData>>,
+    // schema) that the staticdata browser and the DAT-merge read/edit/save.
     pub staticdata_doc: RwLock<Option<StaticDataDoc>>,
     pub staticmapdata: RwLock<Option<StaticMapData>>,
 
@@ -60,7 +57,7 @@ pub struct AppState {
     // Staged merge operations (written to disk only on save_all_merge)
     pub staged_sprite_files: RwLock<Vec<(PathBuf, PathBuf)>>,              // (src, dst) LZMA copies
     pub staged_catalog: RwLock<Option<(PathBuf, Vec<serde_json::Value>)>>, // (path, full catalog JSON)
-    pub staged_staticdata: RwLock<Option<(PathBuf, StaticData)>>,          // (path, merged data)
+    pub staged_staticdata: RwLock<Option<(PathBuf, StaticDataDoc)>>,       // (path, merged doc)
     pub staged_staticmapdata: RwLock<Option<(PathBuf, Vec<u8>)>>,          // (path, encoded protobuf)
 
     // Imported sprite overrides (e.g., from AEC files)
@@ -76,7 +73,6 @@ impl AppState {
             appearances: RwLock::new(None),
             sprite_loader: RwLock::new(None),
             tibia_path: Mutex::new(None),
-            staticdata: RwLock::new(None),
             staticdata_doc: RwLock::new(None),
             staticmapdata: RwLock::new(None),
 

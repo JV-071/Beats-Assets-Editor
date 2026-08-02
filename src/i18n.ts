@@ -246,8 +246,8 @@ const translationEntries = {
   'modal.static.c.quests': {
     default: 'Nova Quest Tracker', 'pt-BR': 'Nova Quest Tracker', en: 'New Quest Tracker', es: 'Nuevo Quest Tracker', ru: 'Новый квест-трекер'
   },
-  'modal.static.c.titles': {
-    default: 'Novo Título', 'pt-BR': 'Novo Título', en: 'New Title', es: 'Nuevo título', ru: 'Новый титул'
+  'modal.static.c.achievements': {
+    default: 'Nova Conquista', 'pt-BR': 'Nova Conquista', en: 'New Achievement', es: 'Nuevo logro', ru: 'Новое достижение'
   },
   'modal.static.c.default': {
     default: 'Novo Item', 'pt-BR': 'Novo Item', en: 'New Item', es: 'Nuevo elemento', ru: 'Новый элемент'
@@ -390,8 +390,8 @@ const translationEntries = {
   'browser.static.type.quests': {
     default: 'Quests', 'pt-BR': 'Quests', en: 'Quests', es: 'Misiones', ru: 'Квесты'
   },
-  'browser.static.type.titles': {
-    default: 'Titles', 'pt-BR': 'Títulos', en: 'Titles', es: 'Títulos', ru: 'Титулы'
+  'browser.static.type.achievements': {
+    default: 'Achievements', 'pt-BR': 'Conquistas', en: 'Achievements', es: 'Logros', ru: 'Достижения'
   },
   'browser.static.type.houses': {
     default: 'Houses', 'pt-BR': 'Casas', en: 'Houses', es: 'Casas', ru: 'Дома'
@@ -1135,6 +1135,56 @@ const translationEntries = {
     es: 'Minimapa',
     ru: 'Миникарта'
   },
+  'category.clientConfig': { default: 'Client Config', 'pt-BR': 'Config. do Cliente', en: 'Client Config', es: 'Config. del Cliente', ru: 'Настройки клиента' },
+  // ── Client config page ──────────────────────────────────────────────────
+  'clientcfg.title': { default: 'Client Config', 'pt-BR': 'Configuração do Cliente', en: 'Client Config', es: 'Configuración del Cliente', ru: 'Настройки клиента' },
+  'clientcfg.noPath': { default: 'No client folder set. Load a client first.', 'pt-BR': 'Nenhuma pasta de cliente definida. Carregue um cliente primeiro.', en: 'No client folder set. Load a client first.', es: 'No hay carpeta de cliente. Carga un cliente primero.', ru: 'Папка клиента не задана. Сначала загрузите клиент.' },
+  'clientcfg.reload': { default: 'Reload', 'pt-BR': 'Recarregar', en: 'Reload', es: 'Recargar', ru: 'Обновить' },
+  'clientcfg.save': { default: 'Save', 'pt-BR': 'Salvar', en: 'Save', es: 'Guardar', ru: 'Сохранить' },
+  'clientcfg.saving': { default: 'Saving…', 'pt-BR': 'Salvando…', en: 'Saving…', es: 'Guardando…', ru: 'Сохранение…' },
+  'clientcfg.urls.title': { default: 'URLs (config.ini)', 'pt-BR': 'URLs (config.ini)', en: 'URLs (config.ini)', es: 'URLs (config.ini)', ru: 'URL-адреса (config.ini)' },
+  'clientcfg.urls.empty': { default: 'No [URLS] entries found.', 'pt-BR': 'Nenhuma entrada em [URLS] encontrada.', en: 'No [URLS] entries found.', es: 'No se encontraron entradas en [URLS].', ru: 'Записи в [URLS] не найдены.' },
+  'clientcfg.urls.saved': { default: 'URLs saved.', 'pt-BR': 'URLs salvas.', en: 'URLs saved.', es: 'URLs guardadas.', ru: 'URL-адреса сохранены.' },
+  'clientcfg.urls.loadErr': { default: 'Failed to load URLs: {{err}}', 'pt-BR': 'Falha ao carregar URLs: {{err}}', en: 'Failed to load URLs: {{err}}', es: 'Error al cargar URLs: {{err}}', ru: 'Не удалось загрузить URL: {{err}}' },
+  'clientcfg.urls.saveErr': { default: 'Failed to save URLs: {{err}}', 'pt-BR': 'Falha ao salvar URLs: {{err}}', en: 'Failed to save URLs: {{err}}', es: 'Error al guardar URLs: {{err}}', ru: 'Не удалось сохранить URL: {{err}}' },
+  'clientcfg.payloads.title': { default: 'Payload reference', 'pt-BR': 'Referência de payloads', en: 'Payload reference', es: 'Referencia de payloads', ru: 'Справка по payload' },
+  'clientcfg.payloads.help': { default: 'Some URLs get parameters appended by the client at runtime — keep the base URL; the client adds the rest.', 'pt-BR': 'Algumas URLs recebem parâmetros anexados pelo cliente em tempo de execução — mantenha a URL base; o cliente adiciona o resto.', en: 'Some URLs get parameters appended by the client at runtime — keep the base URL; the client adds the rest.', es: 'Algunas URLs reciben parámetros añadidos por el cliente en tiempo de ejecución — mantén la URL base; el cliente añade el resto.', ru: 'К некоторым URL клиент добавляет параметры во время выполнения — оставьте базовый URL, остальное добавит клиент.' },
+  'payload.login': { default: 'The client POSTs login credentials as JSON to this endpoint and expects the character/world list back.', 'pt-BR': 'O cliente envia (POST) as credenciais de login em JSON para este endpoint e espera a lista de personagens/mundos de volta.', en: 'The client POSTs login credentials as JSON to this endpoint and expects the character/world list back.', es: 'El cliente envía (POST) las credenciales de inicio de sesión en JSON a este endpoint y espera la lista de personajes/mundos.', ru: 'Клиент отправляет (POST) учётные данные в JSON на этот endpoint и ожидает список персонажей/миров.' },
+  'payload.store': { default: 'Appends &clienttarget=payment&clientselection=… to redirect into the store checkout.', 'pt-BR': 'Anexa &clienttarget=payment&clientselection=… para redirecionar ao checkout da loja.', en: 'Appends &clienttarget=payment&clientselection=… to redirect into the store checkout.', es: 'Añade &clienttarget=payment&clientselection=… para redirigir al pago de la tienda.', ru: 'Добавляет &clienttarget=payment&clientselection=… для перехода к оплате в магазине.' },
+  'payload.wheel': { default: 'Appends &code=<build> — the exported Wheel of Destiny build code.', 'pt-BR': 'Anexa &code=<build> — o código da build exportada da Roda do Destino.', en: 'Appends &code=<build> — the exported Wheel of Destiny build code.', es: 'Añade &code=<build> — el código de build exportado de la Rueda del Destino.', ru: 'Добавляет &code=<build> — экспортированный код сборки Колеса Судьбы.' },
+  'payload.survey': { default: 'Appends /<sid> — the survey id to open.', 'pt-BR': 'Anexa /<sid> — o id da pesquisa a abrir.', en: 'Appends /<sid> — the survey id to open.', es: 'Añade /<sid> — el id de la encuesta a abrir.', ru: 'Добавляет /<sid> — идентификатор опроса.' },
+  'payload.crash': { default: 'Receives crash dumps / hardware reports the client uploads (POST). Point at your own collector or a dummy.', 'pt-BR': 'Recebe dumps de crash / relatórios de hardware que o cliente envia (POST). Aponte para seu próprio coletor ou um dummy.', en: 'Receives crash dumps / hardware reports the client uploads (POST). Point at your own collector or a dummy.', es: 'Recibe volcados de fallos / informes de hardware que el cliente sube (POST). Apunta a tu propio recolector o a uno ficticio.', ru: 'Принимает аварийные дампы / отчёты об оборудовании, отправляемые клиентом (POST). Укажите свой сборщик или заглушку.' },
+  'payload.fps': { default: 'Receives FPS/hardware history uploads (POST).', 'pt-BR': 'Recebe envios de histórico de FPS/hardware (POST).', en: 'Receives FPS/hardware history uploads (POST).', es: 'Recibe envíos del historial de FPS/hardware (POST).', ru: 'Принимает загрузку истории FPS/оборудования (POST).' },
+  'clientcfg.be.title': { default: 'BattleEye', 'pt-BR': 'BattleEye', en: 'BattleEye', es: 'BattleEye', ru: 'BattleEye' },
+  'clientcfg.be.scanning': { default: 'Scanning client.exe…', 'pt-BR': 'Escaneando client.exe…', en: 'Scanning client.exe…', es: 'Escaneando client.exe…', ru: 'Сканирование client.exe…' },
+  'clientcfg.be.notFound': { default: 'BattleEye gate not found (unknown build or already modified).', 'pt-BR': 'Ponto do BattleEye não encontrado (build desconhecido ou já modificado).', en: 'BattleEye gate not found (unknown build or already modified).', es: 'No se encontró el punto de BattleEye (build desconocida o ya modificada).', ru: 'Точка BattleEye не найдена (неизвестная сборка или уже изменена).' },
+  'clientcfg.be.scanned': { default: 'Scanned', 'pt-BR': 'Escaneados', en: 'Scanned', es: 'Escaneados', ru: 'Просканировано' },
+  'clientcfg.be.active': { default: 'Active (client enforces BattleEye)', 'pt-BR': 'Ativo (o cliente exige BattleEye)', en: 'Active (client enforces BattleEye)', es: 'Activo (el cliente exige BattleEye)', ru: 'Активен (клиент требует BattleEye)' },
+  'clientcfg.be.inactive': { default: 'Disabled (gate patched out)', 'pt-BR': 'Desativado (verificação removida)', en: 'Disabled (gate patched out)', es: 'Desactivado (verificación eliminada)', ru: 'Отключён (проверка удалена)' },
+  'clientcfg.be.disable': { default: 'Disable BattleEye', 'pt-BR': 'Desativar BattleEye', en: 'Disable BattleEye', es: 'Desactivar BattleEye', ru: 'Отключить BattleEye' },
+  'clientcfg.be.enable': { default: 'Re-enable BattleEye', 'pt-BR': 'Reativar BattleEye', en: 'Re-enable BattleEye', es: 'Reactivar BattleEye', ru: 'Включить BattleEye' },
+  'clientcfg.be.confirmTitle': { default: 'Patch client.exe?', 'pt-BR': 'Patchear o client.exe?', en: 'Patch client.exe?', es: '¿Parchear client.exe?', ru: 'Пропатчить client.exe?' },
+  'clientcfg.be.confirmDisable': { default: 'This writes one byte in {{exe}} to disable the BattleEye check. Continue?', 'pt-BR': 'Isso grava um byte em {{exe}} para desativar a verificação do BattleEye. Continuar?', en: 'This writes one byte in {{exe}} to disable the BattleEye check. Continue?', es: 'Esto escribe un byte en {{exe}} para desactivar la verificación de BattleEye. ¿Continuar?', ru: 'Это запишет один байт в {{exe}}, чтобы отключить проверку BattleEye. Продолжить?' },
+  'clientcfg.be.confirmEnable': { default: 'This restores the BattleEye check in {{exe}}. Continue?', 'pt-BR': 'Isso restaura a verificação do BattleEye em {{exe}}. Continuar?', en: 'This restores the BattleEye check in {{exe}}. Continue?', es: 'Esto restaura la verificación de BattleEye en {{exe}}. ¿Continuar?', ru: 'Это восстановит проверку BattleEye в {{exe}}. Продолжить?' },
+  'clientcfg.be.enabled': { default: 'BattleEye re-enabled.', 'pt-BR': 'BattleEye reativado.', en: 'BattleEye re-enabled.', es: 'BattleEye reactivado.', ru: 'BattleEye снова включён.' },
+  'clientcfg.be.disabled': { default: 'BattleEye disabled.', 'pt-BR': 'BattleEye desativado.', en: 'BattleEye disabled.', es: 'BattleEye desactivado.', ru: 'BattleEye отключён.' },
+  'clientcfg.be.loadErr': { default: 'Failed to read BattleEye status: {{err}}', 'pt-BR': 'Falha ao ler o status do BattleEye: {{err}}', en: 'Failed to read BattleEye status: {{err}}', es: 'Error al leer el estado de BattleEye: {{err}}', ru: 'Не удалось прочитать статус BattleEye: {{err}}' },
+  'clientcfg.be.patchErr': { default: 'Patch failed: {{err}}', 'pt-BR': 'Falha no patch: {{err}}', en: 'Patch failed: {{err}}', es: 'Error al parchear: {{err}}', ru: 'Ошибка патча: {{err}}' },
+  'clientcfg.be.note': { default: 'Signature-based patch (JNZ↔JMP), version-tolerant. Applied only on a unique match; keep a client backup.', 'pt-BR': 'Patch por assinatura (JNZ↔JMP), tolerante a versão. Aplicado só em match único; mantenha um backup do cliente.', en: 'Signature-based patch (JNZ↔JMP), version-tolerant. Applied only on a unique match; keep a client backup.', es: 'Parche por firma (JNZ↔JMP), tolerante a versiones. Se aplica solo con coincidencia única; guarda una copia del cliente.', ru: 'Патч по сигнатуре (JNZ↔JMP), устойчив к версиям. Применяется только при уникальном совпадении; сохраните резервную копию клиента.' },
+  'clientcfg.rsa.title': { default: 'RSA login key', 'pt-BR': 'Chave RSA de login', en: 'RSA login key', es: 'Clave RSA de inicio de sesión', ru: 'RSA-ключ входа' },
+  'clientcfg.rsa.scanning': { default: 'Scanning client.exe…', 'pt-BR': 'Escaneando client.exe…', en: 'Scanning client.exe…', es: 'Escaneando client.exe…', ru: 'Сканирование client.exe…' },
+  'clientcfg.rsa.notFound': { default: 'RSA modulus not found (unknown build or already modified).', 'pt-BR': 'Modulus RSA não encontrado (build desconhecido ou já modificado).', en: 'RSA modulus not found (unknown build or already modified).', es: 'No se encontró el módulo RSA (build desconocida o ya modificada).', ru: 'RSA-модуль не найден (неизвестная сборка или уже изменён).' },
+  'clientcfg.rsa.isOt': { default: 'Current: OT default key', 'pt-BR': 'Atual: chave padrão de OT', en: 'Current: OT default key', es: 'Actual: clave por defecto de OT', ru: 'Текущий: стандартный OT-ключ' },
+  'clientcfg.rsa.isCustom': { default: 'Current: custom key', 'pt-BR': 'Atual: chave personalizada', en: 'Current: custom key', es: 'Actual: clave personalizada', ru: 'Текущий: пользовательский ключ' },
+  'clientcfg.rsa.newLabel': { default: 'New modulus (hex, 1024-bit / 256 chars):', 'pt-BR': 'Novo modulus (hex, 1024-bit / 256 chars):', en: 'New modulus (hex, 1024-bit / 256 chars):', es: 'Nuevo módulo (hex, 1024-bit / 256 caracteres):', ru: 'Новый модуль (hex, 1024-бит / 256 символов):' },
+  'clientcfg.rsa.placeholder': { default: 'Paste the modulus of your server key (config.lua)…', 'pt-BR': 'Cole o modulus da chave do seu servidor (config.lua)…', en: 'Paste the modulus of your server key (config.lua)…', es: 'Pega el módulo de la clave de tu servidor (config.lua)…', ru: 'Вставьте модуль ключа вашего сервера (config.lua)…' },
+  'clientcfg.rsa.apply': { default: 'Apply new key', 'pt-BR': 'Aplicar nova chave', en: 'Apply new key', es: 'Aplicar nueva clave', ru: 'Применить новый ключ' },
+  'clientcfg.rsa.confirmTitle': { default: 'Replace RSA key?', 'pt-BR': 'Substituir a chave RSA?', en: 'Replace RSA key?', es: '¿Reemplazar la clave RSA?', ru: 'Заменить RSA-ключ?' },
+  'clientcfg.rsa.confirm': { default: 'This overwrites the RSA modulus in {{exe}}. The client will only connect to a server holding the matching private key. Continue?', 'pt-BR': 'Isso sobrescreve o modulus RSA em {{exe}}. O cliente só conectará a um servidor que tenha a chave privada correspondente. Continuar?', en: 'This overwrites the RSA modulus in {{exe}}. The client will only connect to a server holding the matching private key. Continue?', es: 'Esto sobrescribe el módulo RSA en {{exe}}. El cliente solo se conectará a un servidor con la clave privada correspondiente. ¿Continuar?', ru: 'Это перезапишет RSA-модуль в {{exe}}. Клиент подключится только к серверу с соответствующим приватным ключом. Продолжить?' },
+  'clientcfg.rsa.saved': { default: 'RSA key replaced.', 'pt-BR': 'Chave RSA substituída.', en: 'RSA key replaced.', es: 'Clave RSA reemplazada.', ru: 'RSA-ключ заменён.' },
+  'clientcfg.rsa.loadErr': { default: 'Failed to read RSA key: {{err}}', 'pt-BR': 'Falha ao ler a chave RSA: {{err}}', en: 'Failed to read RSA key: {{err}}', es: 'Error al leer la clave RSA: {{err}}', ru: 'Не удалось прочитать RSA-ключ: {{err}}' },
+  'clientcfg.rsa.saveErr': { default: 'Failed to replace RSA key: {{err}}', 'pt-BR': 'Falha ao substituir a chave RSA: {{err}}', en: 'Failed to replace RSA key: {{err}}', es: 'Error al reemplazar la clave RSA: {{err}}', ru: 'Не удалось заменить RSA-ключ: {{err}}' },
+  'clientcfg.rsa.note': { default: 'In-place hex overwrite (same length). Applied only on a unique match; keep a client backup. The server must hold the matching private key.', 'pt-BR': 'Sobrescrita hex no mesmo lugar (mesmo tamanho). Aplicado só em match único; mantenha um backup do cliente. O servidor precisa ter a chave privada correspondente.', en: 'In-place hex overwrite (same length). Applied only on a unique match; keep a client backup. The server must hold the matching private key.', es: 'Sobrescritura hex in situ (misma longitud). Se aplica solo con coincidencia única; guarda una copia del cliente. El servidor debe tener la clave privada correspondiente.', ru: 'Перезапись hex на месте (та же длина). Применяется только при уникальном совпадении; сохраните резервную копию клиента. Сервер должен иметь соответствующий приватный ключ.' },
   'minimap.tab.markers': { default: 'Markers', 'pt-BR': 'Marcadores', en: 'Markers', es: 'Marcadores', ru: 'Метки' },
   'minimap.tab.map': { default: 'Map', 'pt-BR': 'Mapa', en: 'Map', es: 'Mapa', ru: 'Карта' },
   'minimap.search.markers': { default: 'Search markers…', 'pt-BR': 'Buscar marcadores…', en: 'Search markers…', es: 'Buscar marcadores…', ru: 'Поиск меток…' },
@@ -1183,12 +1233,12 @@ const translationEntries = {
     es: '{{count}} misiones',
     ru: '{{count}} квестов'
   },
-  'category.titlesCount': {
-    default: '{{count}} titles',
-    'pt-BR': '{{count}} títulos',
-    en: '{{count}} titles',
-    es: '{{count}} títulos',
-    ru: '{{count}} титулов'
+  'category.achievementsCount': {
+    default: '{{count}} achievements',
+    'pt-BR': '{{count}} conquistas',
+    en: '{{count}} achievements',
+    es: '{{count}} logros',
+    ru: '{{count}} достижений'
   },
   'category.monsterClassesCount': {
     default: '{{count}} monster classes',
@@ -3451,7 +3501,7 @@ const translationEntries = {
   'modal.static.info.none': { default: 'None', 'pt-BR': 'Nenhum', en: 'None', es: 'Ninguno', ru: 'Нет' },
   'modal.static.info.noOutfit': { default: 'No outfit assigned', 'pt-BR': 'Nenhum outfit atribuído', en: 'No outfit assigned', es: 'Sin atuendo asignado', ru: 'Наряд не назначен' },
 
-  'modal.static.info.titleProfile': { default: 'Title Profile', 'pt-BR': 'Perfil do Título', en: 'Title Profile', es: 'Perfil del Título', ru: 'Профиль титула' },
+  'modal.static.info.achievementProfile': { default: 'Achievement Profile', 'pt-BR': 'Perfil da Conquista', en: 'Achievement Profile', es: 'Perfil del Logro', ru: 'Профиль достижения' },
   'modal.static.info.gradeRank': { default: 'Grade Rank', 'pt-BR': 'Rank', en: 'Grade Rank', es: 'Rango', ru: 'Ранг' },
   'modal.static.info.unlockDesc': { default: 'Unlock Description', 'pt-BR': 'Descrição de Desbloqueio', en: 'Unlock Description', es: 'Descripción de Desbloqueo', ru: 'Описание разблокировки' },
   'modal.static.info.noDesc': { default: 'No description provided.', 'pt-BR': 'Nenhuma descrição fornecida.', en: 'No description provided.', es: 'No se proporciona descripción.', ru: 'Описание не предоставлено.' },
@@ -3506,6 +3556,7 @@ const translationEntries = {
   'asset.edit.attr.light': { default: 'Light', 'pt-BR': 'Luz (Light)', en: 'Light', es: 'Luz', ru: 'Свет' },
   'asset.edit.attr.shift': { default: 'Shift', 'pt-BR': 'Deslocamento (Shift)', en: 'Shift', es: 'Desplazamiento', ru: 'Смещение' },
   'asset.edit.attr.height': { default: 'Height', 'pt-BR': 'Altura (Height)', en: 'Height', es: 'Altura', ru: 'Высота' },
+  'asset.edit.attr.bank': { default: 'Bank', 'pt-BR': 'Bank (Piso)', en: 'Bank', es: 'Bank (Suelo)', ru: 'Банк (пол)' },
   'asset.edit.attr.write': { default: 'Write', 'pt-BR': 'Escrever (Write)', en: 'Write', es: 'Escribir', ru: 'Написать' },
   'asset.edit.attr.writeOnce': { default: 'Write Once', 'pt-BR': 'Esc. Uma Vez (Write Once)', en: 'Write Once', es: 'Escribir una vez', ru: 'Написать один раз' },
   'asset.edit.attr.automap': { default: 'Automap', 'pt-BR': 'Minimapa (Automap)', en: 'Automap', es: 'Minimapa', ru: 'Автокарта' },

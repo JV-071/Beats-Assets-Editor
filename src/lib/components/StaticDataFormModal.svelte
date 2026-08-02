@@ -34,7 +34,7 @@
   let isArchfoe = $state(false);
 
   // Title exclusives
-  let titleDescription = $state("");
+  let achievementDescription = $state("");
   let grade = $state<number | "">("");
 
   $effect(() => {
@@ -54,7 +54,7 @@
       isNpc = false;
       isHostile = false;
       isArchfoe = false;
-      titleDescription = "";
+      achievementDescription = "";
       grade = "";
     }
   });
@@ -92,8 +92,8 @@
       payload.is_archfoe = isArchfoe;
     }
 
-    if (dataType === "titles") {
-      payload.description = titleDescription.trim();
+    if (dataType === "achievements") {
+      payload.description = achievementDescription.trim();
       payload.grade = grade !== "" ? Number(grade) : 0;
     }
 
@@ -108,8 +108,8 @@
         return translate("modal.static.c.bosses");
       case "quests":
         return translate("modal.static.c.quests");
-      case "titles":
-        return translate("modal.static.c.titles");
+      case "achievements":
+        return translate("modal.static.c.achievements");
       default:
         return translate("modal.static.c.default");
     }
@@ -392,14 +392,14 @@
             </div>
           {/if}
 
-          {#if dataType === "titles"}
+          {#if dataType === "achievements"}
             <div class="form-group">
-              <label for="itemTitleDesc"
+              <label for="itemAchievementDesc"
                 >{translate("modal.static.lbl.desc")}</label
               >
               <textarea
-                id="itemTitleDesc"
-                bind:value={titleDescription}
+                id="itemAchievementDesc"
+                bind:value={achievementDescription}
                 class="modern-input"
                 rows="3"
                 placeholder={translate("modal.static.lbl.descHint")}

@@ -34,6 +34,10 @@
   function buildFlags(sourceDetails: CompleteAppearanceItem) {
     let newFlags = JSON.parse(JSON.stringify(sourceDetails.flags || {}));
 
+    // `bank` starts blank (not 0) so an untouched item keeps having no bank
+    // flag: the save only calls the backend when the value actually changed,
+    // and an empty field means "remove the flag".
+    if (!newFlags.bank) newFlags.bank = { waypoints: undefined };
     if (!newFlags.light) newFlags.light = { brightness: 0, color: 0 };
     if (!newFlags.shift) newFlags.shift = { x: 0, y: 0 };
     if (!newFlags.height) newFlags.height = { elevation: 0 };
@@ -171,6 +175,19 @@
   </div>
 </div>
 
+{#if flags.bank}
+  <div class="detail-section">
+    <h4>{translate("asset.edit.attr.bank")}</h4>
+    <div class="detail-item">
+      <span class="detail-label"
+        >{translate("asset.flags.field.waypointsSpeed")}</span
+      >
+      <div class="number-input">
+        <input type="number" bind:value={flags.bank.waypoints} />
+      </div>
+    </div>
+  </div>
+{/if}
 {#if flags.light}
   <div class="detail-section">
     <h4>{translate("asset.edit.attr.light")}</h4>

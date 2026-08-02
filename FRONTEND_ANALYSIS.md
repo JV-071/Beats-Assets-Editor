@@ -565,7 +565,7 @@ export default defineConfig({
 | **@tauri-apps/plugin-dialog** | ^2 | File dialogs | ⭐⭐⭐ |
 | **@tauri-apps/plugin-opener** | ^2 | Open files/URLs | ⭐⭐⭐ |
 | **vite** | ^6.0.3 | Build tool | ⭐⭐⭐⭐⭐ |
-| **typescript** | ~5.6.2 | Type checking | ⭐⭐⭐⭐ |
+| **typescript** | ^7.0.2 | Type checking | ⭐⭐⭐⭐ |
 
 ### Build Configuration
 

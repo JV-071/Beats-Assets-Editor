@@ -2,6 +2,17 @@
 import type { CompleteAppearanceItem, AppearanceStats, ProficiencyEntry } from '../types';
 import { SvelteMap } from 'svelte/reactivity';
 
+/// Categories the staticdata browser can display. `achievements` is legacy
+/// field 2 / new-client field 3 — the client has no editable "titles" asset.
+export type StaticDataType =
+    | 'creatures'
+    | 'bosses'
+    | 'quests'
+    | 'achievements'
+    | 'monster_classes'
+    | 'houses'
+    | 'map_houses';
+
 function createAssetsState() {
     const state = $state({
         assets: [] as CompleteAppearanceItem[],
@@ -10,7 +21,7 @@ function createAssetsState() {
         creatures: [] as any[],
         bosses: [] as any[],
         quests: [] as any[],
-        titles: [] as any[],
+        achievements: [] as any[],
         monsterClasses: [] as any[],
         houses: [] as any[],
         mapHouses: [] as any[],
@@ -32,8 +43,8 @@ function createAssetsState() {
         currentPage: 0,
         pageSize: 100,
         totalItems: 0,
-        viewMode: 'categories' as 'categories' | 'grid' | 'staticdata' | 'rcc' | 'qm' | 'proficiency' | 'dat-merge' | 'minimap',
-        currentStaticDataType: 'creatures' as 'creatures' | 'bosses' | 'quests' | 'titles' | 'monster_classes' | 'houses' | 'map_houses',
+        viewMode: 'categories' as 'categories' | 'grid' | 'staticdata' | 'rcc' | 'qm' | 'proficiency' | 'dat-merge' | 'minimap' | 'client-config',
+        currentStaticDataType: 'creatures' as StaticDataType,
         isLoading: false,
         loadingProgress: 0,
         loadingText: '',
@@ -62,7 +73,7 @@ export function setCategory(category: string) {
     }
 }
 
-export function selectStaticDataMode(dataType: 'creatures' | 'bosses' | 'quests' | 'titles' | 'monster_classes' | 'houses' | 'map_houses') {
+export function selectStaticDataMode(dataType: StaticDataType) {
     assetsState.currentStaticDataType = dataType;
     assetsState.viewMode = 'staticdata';
 }
@@ -72,7 +83,7 @@ export function updateStaticDataState(category: string, updatedList: any[]) {
         case 'creatures': assetsState.creatures = updatedList; break;
         case 'bosses': assetsState.bosses = updatedList; break;
         case 'quests': assetsState.quests = updatedList; break;
-        case 'titles': assetsState.titles = updatedList; break;
+        case 'achievements': assetsState.achievements = updatedList; break;
         case 'monster_classes': assetsState.monsterClasses = updatedList; break;
         case 'houses': assetsState.houses = updatedList; break;
         case 'map_houses': assetsState.mapHouses = updatedList; break;
@@ -97,4 +108,8 @@ export function selectDatMergeMode() {
 
 export function selectMinimapMode() {
     assetsState.viewMode = 'minimap';
+}
+
+export function selectClientConfigMode() {
+    assetsState.viewMode = 'client-config';
 }

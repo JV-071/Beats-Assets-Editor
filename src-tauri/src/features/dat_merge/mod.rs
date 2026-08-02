@@ -514,7 +514,7 @@ pub struct SaveAllMergeResult {
 /// This is the only command that writes files — all execute_* commands only stage in memory.
 #[tauri::command]
 pub async fn save_all_merge(dat_path: String, state: State<'_, AppState>) -> Result<SaveAllMergeResult, String> {
-    use crate::features::staticdata::parsers::save_staticdata;
+    use crate::features::staticdata::parsers::save_staticdata_doc;
     use prost::Message;
 
     // 1. Save appearances .dat
@@ -554,7 +554,7 @@ pub async fn save_all_merge(dat_path: String, state: State<'_, AppState>) -> Res
     let staticdata_saved = {
         let lock = state.staged_staticdata.read();
         if let Some((path, data)) = lock.as_ref() {
-            save_staticdata(path, data).map_err(|e| format!("Write staticdata error: {}", e))?;
+            save_staticdata_doc(path, data).map_err(|e| format!("Write staticdata error: {}", e))?;
             true
         } else {
             false

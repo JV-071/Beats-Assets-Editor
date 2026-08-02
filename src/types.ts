@@ -1,5 +1,48 @@
 // Type definitions for Canary Studio Editor
 
+// ── Client config (config.ini URLs + BattleEye) ──────────────────────────────
+export interface ClientUrlEntry {
+  key: string;
+  value: string;
+}
+
+export interface ClientUrls {
+  configPath: string;
+  entries: ClientUrlEntry[];
+}
+
+/** State of the client-side BattleEye gate in client.exe. */
+export interface BattleEyeStatus {
+  found: boolean;
+  /** true = active (JNZ), false = disabled (JMP), null if not found. */
+  enabled: boolean | null;
+  /** File offset of the flipped byte. */
+  offset: number | null;
+  signature: string | null;
+}
+
+export interface BattleEyeInfo {
+  exePath: string | null;
+  status: BattleEyeStatus;
+  scanned: string[];
+}
+
+/** State of the RSA login modulus in client.exe. */
+export interface RsaStatus {
+  found: boolean;
+  /** Current modulus as uppercase hex (256 chars), or null. */
+  modulus: string | null;
+  offset: number | null;
+  /** True when the current modulus is the OT/TFS/Canary default. */
+  isOtDefault: boolean;
+}
+
+export interface RsaInfo {
+  exePath: string | null;
+  status: RsaStatus;
+  scanned: string[];
+}
+
 export interface AppearanceStats {
   // Primary counts (last IDs - like Assets Editor)
   object_count: number;
@@ -20,7 +63,7 @@ export interface StaticDataStats {
   version: string;
   total_creatures: number; // new schema: monsters
   total_monster_classes: number; // new schema only
-  total_titles: number; // new schema: achievements
+  total_achievements: number; // legacy field 2 / new field 3
   total_houses: number;
   total_bosses: number;
   total_quests: number;
@@ -60,7 +103,7 @@ export interface StaticCreature {
   is_hostile: boolean;
 }
 
-export interface StaticTitle {
+export interface StaticAchievement {
   id: number;
   name: string;
   description: string;

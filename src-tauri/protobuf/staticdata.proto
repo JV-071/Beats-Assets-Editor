@@ -6,7 +6,10 @@ import "shared.proto";
 
 message StaticData {
   repeated CreatureType creatures = 1;
-  repeated Title titles = 2;
+  // Renamed from `titles`: the payload has always been achievements (same
+  // shape as the newer client's `Achievement`). Field NUMBER is unchanged, so
+  // existing files still decode byte-identically.
+  repeated Achievement achievements = 2;
   repeated HouseData houses = 3;
   repeated BossData bosses = 4;
   repeated QuestData quests = 5;
@@ -36,7 +39,7 @@ message OutfitColors {
   optional uint32 feet = 4;
 }
 
-message Title {
+message Achievement {
   optional uint32 id = 1;
   optional string name = 2;
   optional string description = 3;

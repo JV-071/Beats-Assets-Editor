@@ -4,59 +4,28 @@ use prost::Message;
 use std::fs;
 use std::path::Path;
 
-pub fn load_staticdata<P: AsRef<Path>>(path: P) -> Result<StaticData> {
-    let path = path.as_ref();
-    log::info!("Loading staticdata file: {:?}", path);
-
-    let data = fs::read(path).context(format!("Failed to read staticdata file: {:?}", path))?;
-
-    match StaticData::decode(&data[..]) {
-        Ok(staticdata) => {
-            log::info!("Staticdata decoded directly without decompression");
-            return Ok(staticdata);
-        }
-        Err(e) => {
-            log::warn!("Direct protobuf decode failed: {}. Trying LZMA/XZ decompress fallback...", e);
-        }
-    }
-
-    let decompressed = crate::core::lzma::decompress(&data).context("Failed to decompress staticdata data (LZMA/XZ)")?;
-    let staticdata = StaticData::decode(&decompressed[..]).context("Failed to decode staticdata protobuf data after decompression")?;
-
-    log::info!(
-        "Successfully parsed staticdata: {} creatures, {} titles, {} houses, {} bosses, {} quests",
-        staticdata.creatures.len(),
-        staticdata.titles.len(),
-        staticdata.houses.len(),
-        staticdata.bosses.len(),
-        staticdata.quests.len()
-    );
-
-    Ok(staticdata)
-}
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct StaticDataStats {
     /// Which schema the loaded file matched: "old" or "new".
     pub version: String,
     pub total_creatures: usize,       // new schema: monsters
     pub total_monster_classes: usize, // new schema only (legacy files have none)
-    pub total_titles: usize,          // new schema: achievements
+    pub total_achievements: usize,    // legacy field 2 / new field 3
     pub total_houses: usize,
     pub total_bosses: usize,
     pub total_quests: usize,
 }
 
-/// Statistics for a (versioned) staticdata document. Category names follow the
-/// legacy labels the frontend already uses; the `version` field disambiguates,
-/// and `total_monster_classes` surfaces the new-schema-only category.
+/// Statistics for a (versioned) staticdata document. The `version` field says
+/// which schema matched, and `total_monster_classes` surfaces the
+/// new-schema-only category.
 pub fn doc_statistics(doc: &StaticDataDoc) -> StaticDataStats {
     match doc {
         StaticDataDoc::Old(o) => StaticDataStats {
             version: "old".into(),
             total_creatures: o.creatures.len(),
             total_monster_classes: 0,
-            total_titles: o.titles.len(),
+            total_achievements: o.achievements.len(),
             total_houses: o.houses.len(),
             total_bosses: o.bosses.len(),
             total_quests: o.quests.len(),
@@ -65,7 +34,7 @@ pub fn doc_statistics(doc: &StaticDataDoc) -> StaticDataStats {
             version: "new".into(),
             total_creatures: n.monsters.len(),
             total_monster_classes: n.monster_classes.len(),
-            total_titles: n.achievements.len(),
+            total_achievements: n.achievements.len(),
             total_houses: n.houses.len(),
             total_bosses: n.bosses.len(),
             total_quests: n.quests.len(),
@@ -83,15 +52,22 @@ enum StaticDataFormat {
 
 /// Detect the on-disk format of an existing staticdata file so a save can
 /// reproduce it instead of silently rewriting a compressed `.dat` as raw
-/// protobuf (which the original consumer may no longer read).
+/// protobuf (which the original consumer may no longer read) — or the reverse.
+///
+/// The raw check MUST mirror `load_staticdata_doc` and accept **either**
+/// schema. Testing only the legacy schema meant a newer-client file (whose
+/// legacy decode fails) was misread as LZMA, and saving then compressed a file
+/// the client expects raw. There is no magic-byte alternative: Tibia's custom
+/// LZMA has no reliable signature (see `core::lzma`), so raw-vs-LZMA can only
+/// be decided by attempting a decode.
 fn detect_format(bytes: &[u8]) -> StaticDataFormat {
     if crate::core::lzma::is_xz(bytes) {
         StaticDataFormat::Xz
-    } else if StaticData::decode(bytes).is_ok() {
+    } else if decode_doc(bytes).map(|doc| !is_trivially_empty(&doc)).unwrap_or(false) {
         StaticDataFormat::Raw
     } else {
-        // Not raw protobuf and not XZ: the loader treats this as the custom
-        // (Tibia) LZMA format.
+        // Neither XZ nor decodable protobuf: the loader treats this as the
+        // custom (Tibia) LZMA format.
         StaticDataFormat::Lzma
     }
 }
@@ -114,12 +90,6 @@ fn write_with_format<P: AsRef<Path>>(path: P, buf: Vec<u8>) -> Result<()> {
     Ok(())
 }
 
-pub fn save_staticdata<P: AsRef<Path>>(path: P, staticdata: &StaticData) -> Result<()> {
-    let mut buf = Vec::new();
-    staticdata.encode(&mut buf).context("Failed to encode StaticData to protobuf buffer")?;
-    write_with_format(path, buf)
-}
-
 /// Save a versioned staticdata document, encoding the variant that was loaded so
 /// a legacy file is written back legacy and a new file is written back new.
 pub fn save_staticdata_doc<P: AsRef<Path>>(path: P, doc: &StaticDataDoc) -> Result<()> {
@@ -139,13 +109,13 @@ use crate::core::protobuf::staticdata_new::StaticData as StaticDataNew;
 
 /// A decoded staticdata file tagged with the schema it matched.
 ///
-/// The newer client renumbered `StaticData`'s fields (titles/houses/bosses/quests
-/// shifted, `monster_classes`/`achievements` inserted), so the two layouts are
-/// wire-incompatible and a single message type cannot read both. We keep both
-/// and pick per file.
+/// The newer client renumbered `StaticData`'s fields (achievements moved from
+/// 2 to 3, houses/bosses/quests shifted by one, `monster_classes` inserted at
+/// 2), so the two layouts are wire-incompatible and a single message type
+/// cannot read both. We keep both and pick per file.
 #[derive(Debug, Clone)]
 pub enum StaticDataDoc {
-    /// Legacy schema: creatures / titles / houses / bosses / quests.
+    /// Legacy schema: creatures / achievements / houses / bosses / quests.
     Old(StaticData),
     /// Newer client: monsters / monster_classes / achievements / houses / bosses / quests.
     New(StaticDataNew),
@@ -164,7 +134,7 @@ impl StaticDataDoc {
 /// to reject a spurious "success" from decoding still-compressed bytes.
 fn is_trivially_empty(doc: &StaticDataDoc) -> bool {
     match doc {
-        StaticDataDoc::Old(o) => o.creatures.is_empty() && o.titles.is_empty() && o.houses.is_empty() && o.bosses.is_empty() && o.quests.is_empty(),
+        StaticDataDoc::Old(o) => o.creatures.is_empty() && o.achievements.is_empty() && o.houses.is_empty() && o.bosses.is_empty() && o.quests.is_empty(),
         StaticDataDoc::New(n) => n.monsters.is_empty() && n.monster_classes.is_empty() && n.achievements.is_empty() && n.houses.is_empty() && n.bosses.is_empty() && n.quests.is_empty(),
     }
 }
@@ -221,6 +191,60 @@ pub fn load_staticdata_doc<P: AsRef<Path>>(path: P) -> Result<StaticDataDoc> {
 mod tests {
     use super::*;
 
+    /// Regression for the format-detection bug: a **raw** (uncompressed)
+    /// newer-client file must be detected as `Raw`.
+    ///
+    /// The raw check used to be a legacy `StaticData::decode`. On a newer-client
+    /// file that decode fails, so detection fell through to `Lzma` and saving
+    /// LZMA-compressed a file the client only reads raw.
+    #[test]
+    fn new_schema_raw_bytes_are_detected_as_raw() {
+        use crate::core::protobuf::staticdata_new as new;
+
+        let doc = new::StaticData {
+            monsters: vec![new::Monster {
+                id: Some(2),
+                name: Some("orc warlord".into()),
+                ..Default::default()
+            }],
+            monster_classes: vec![new::MonsterClass {
+                id: Some(1),
+                name: Some("Amphibic".into()),
+            }],
+            achievements: vec![new::Achievement {
+                id: Some(2),
+                name: Some("Chorister".into()),
+                description: Some("Lalalala...".into()),
+                grade: Some(1),
+            }],
+            // The non-empty description is what breaks the LEGACY decode:
+            // legacy field 4 is BossData, whose field 3 is a message — not a
+            // string. This mirrors the 3-of-995 real houses that have one.
+            houses: vec![new::House {
+                id: Some(101),
+                name: Some("Targuna Cottage 1".into()),
+                description: Some("Only Sorcerers can enter.".into()),
+                ..Default::default()
+            }],
+            bosses: Vec::new(),
+            quests: Vec::new(),
+        };
+
+        let mut buf = Vec::new();
+        doc.encode(&mut buf).expect("encode new-schema staticdata");
+
+        assert!(StaticData::decode(&buf[..]).is_err(), "precondition: the legacy schema must fail to decode these bytes");
+        assert_eq!(detect_format(&buf), StaticDataFormat::Raw, "raw newer-client bytes must not be mistaken for LZMA");
+    }
+
+    /// An XZ container still wins over the raw check.
+    #[test]
+    fn xz_bytes_are_detected_as_xz() {
+        let raw = b"whatever".to_vec();
+        let xz = crate::core::lzma::compress_xz(&raw).expect("xz compress");
+        assert_eq!(detect_format(&xz), StaticDataFormat::Xz);
+    }
+
     /// Opt-in test against a real client staticdata.dat. Set CANARY_STATICDATA
     /// to its path. Verifies the NEW schema is detected and the categories that
     /// the legacy schema mislabels/drops come back correctly.
@@ -229,6 +253,10 @@ mod tests {
         let Ok(path) = std::env::var("CANARY_STATICDATA") else {
             return;
         };
+        // The real file is uncompressed; saving it must not compress it.
+        let bytes = std::fs::read(&path).expect("read staticdata");
+        assert_eq!(detect_format(&bytes), StaticDataFormat::Raw, "real client staticdata.dat is raw protobuf");
+
         let doc = load_staticdata_doc(&path).expect("load staticdata");
         match doc {
             StaticDataDoc::New(n) => {

@@ -8,6 +8,7 @@
     selectProficiencyMode,
     selectDatMergeMode,
     selectMinimapMode,
+    selectClientConfigMode,
   } from "../../stores/assetsState.svelte";
   import { translate } from "../../i18n";
   import { bindHandler } from "../../utils/handlerFactories";
@@ -48,7 +49,7 @@
   const selectCreatures = bindHandler(selectStaticDataMode, "creatures");
   const selectBosses = bindHandler(selectStaticDataMode, "bosses");
   const selectQuests = bindHandler(selectStaticDataMode, "quests");
-  const selectTitles = bindHandler(selectStaticDataMode, "titles");
+  const selectAchievements = bindHandler(selectStaticDataMode, "achievements");
   const selectMonsterClasses = bindHandler(selectStaticDataMode, "monster_classes");
   const selectHouses = bindHandler(selectStaticDataMode, "houses");
   const selectMapHouses = bindHandler(selectStaticDataMode, "map_houses");
@@ -323,12 +324,12 @@
             <button
               type="button"
               class="subcategory-card"
-              onclick={selectTitles}
+              onclick={selectAchievements}
             >
               <span class="subcat-icon">🏅</span>
               <span class="subcat-name"
-                >{translate("category.titlesCount", {
-                  count: assetsState.staticDataStats.total_titles,
+                >{translate("category.achievementsCount", {
+                  count: assetsState.staticDataStats.total_achievements,
                 })}</span
               >
             </button>
@@ -415,6 +416,14 @@
         >
           <span class="subcat-icon">🗺️</span>
           <span class="subcat-name">{translate("category.minimapEditor")}</span>
+        </button>
+        <button
+          type="button"
+          class="subcategory-card"
+          onclick={selectClientConfigMode}
+        >
+          <span class="subcat-icon">⚙️</span>
+          <span class="subcat-name">{translate("category.clientConfig")}</span>
         </button>
       </div>
     </div>

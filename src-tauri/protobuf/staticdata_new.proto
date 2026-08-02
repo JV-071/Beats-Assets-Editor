@@ -1,9 +1,18 @@
 syntax = "proto2";
 
-// Newer-client staticdata schema. The field numbers in `StaticData` are NOT
-// compatible with the legacy `staticdata.proto` (titles/houses/bosses/quests
-// were renumbered and `monster_classes`/`achievements` inserted), so this lives
-// in its own package and the loader detects which schema a file uses.
+// Newer-client staticdata schema, verified against the type names embedded in
+// the 15.30 client binary (package `tibia.protobuf.staticdata`: Monster,
+// MonsterClass, Achievement, House, BossMonster, Quest).
+//
+// The field numbers in `StaticData` are NOT compatible with the legacy
+// `staticdata.proto`: achievements moved from field 2 to field 3,
+// houses/bosses/quests shifted by one, and `monster_classes` was inserted at
+// field 2. So this lives in its own package and the loader detects which
+// schema a file uses.
+//
+// Note there is no `Title` message in either schema: character titles are not
+// shipped as an asset, they arrive over the wire as
+// `tibia.protobuf.protocol.CharacterTitle`.
 package tibia.protobuf.staticdata_new;
 
 import "shared.proto";
