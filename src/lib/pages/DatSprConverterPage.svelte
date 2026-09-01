@@ -53,7 +53,10 @@
     sprites_converted: number;
     sheets_created: number;
     elapsed_ms: number;
+    log_path?: string;
+    logs?: string[];
   }
+
 
   // ── State ──────────────────────────────────────────────────────────────────
 
@@ -523,7 +526,7 @@
         <section class="result-card">
           <div class="result-header">
             <span class="result-icon">✅</span>
-            <h4>Conversão Realizada!</h4>
+            <h4>Conversão Realizada com Sucesso!</h4>
           </div>
           <div class="result-body">
             <p><strong>Tempo decorrido:</strong> {(conversionResult.elapsed_ms / 1000).toFixed(2)}s</p>
@@ -532,7 +535,18 @@
             {#if conversionResult.aec_path}
               <p><strong>Pacote .AEC gerado:</strong> {conversionResult.aec_path}</p>
             {/if}
+            {#if conversionResult.log_path}
+              <p class="log-path-info"><strong>📄 Log salvo em:</strong> <code>{conversionResult.log_path}</code></p>
+            {/if}
           </div>
+
+          {#if conversionResult.logs && conversionResult.logs.length > 0}
+            <details class="logs-accordion" open>
+              <summary>📋 Ver Detalhes do Log de Execução</summary>
+              <pre class="logs-box">{conversionResult.logs.join("\n")}</pre>
+            </details>
+          {/if}
+
           <button
             class="open-editor-btn"
             onclick={() => loadConvertedAssets(conversionResult!.output_dir)}
@@ -543,12 +557,22 @@
       {:else if errorMessage}
         <section class="error-card">
           <h4>❌ Falha na Conversão</h4>
-          <p>{errorMessage}</p>
+          <p class="error-text">{errorMessage}</p>
+          <div class="error-hint">
+            <p>💡 <strong>Dicas para resolver:</strong></p>
+            <ul>
+              <li>Se o cliente for <strong>OTClient</strong>, certifique-se de ativar a opção <em>Transparência RGBA</em>.</li>
+              <li>Se o cliente possuir mais de 65.535 sprites, ative <em>Extended Sprites</em>.</li>
+              <li>Verifique se você tem permissão de escrita na pasta de destino (evite salvar diretamente dentro de pastas do sistema sem privilégios de administrador).</li>
+              <li>Um arquivo de log com o passo a passo foi gravado no seu computador para análise.</li>
+            </ul>
+          </div>
         </section>
       {/if}
     </div>
   </div>
 </div>
+
 
 <style>
   .converter-page {
@@ -939,6 +963,54 @@
     background: #15803d;
   }
 
+  .log-path-info {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    word-break: break-all;
+  }
+
+  .log-path-info code {
+    background: rgba(0, 0, 0, 0.4);
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    color: #93c5fd;
+  }
+
+  .logs-accordion {
+    margin-top: 1rem;
+    background: #0d1017;
+    border: 1px solid var(--border-color, #2d3345);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .logs-accordion summary {
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #94a3b8;
+  }
+
+  .logs-accordion summary:hover {
+    color: #e2e8f0;
+  }
+
+  .logs-box {
+    margin: 0.75rem 0 0 0;
+    padding: 0.75rem;
+    background: #08090d;
+    border: 1px solid #1e2433;
+    border-radius: 4px;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 0.75rem;
+    color: #cbd5e1;
+    max-height: 220px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.4;
+  }
+
   .error-card {
     border-color: #ef4444;
     background: rgba(239, 68, 68, 0.05);
@@ -949,10 +1021,38 @@
     color: #f87171;
   }
 
-  .error-card p {
-    margin: 0;
+  .error-text {
+    margin: 0 0 1rem 0;
     font-size: 0.85rem;
     color: #fca5a5;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 0.75rem;
+    border-radius: 6px;
+    border-left: 3px solid #ef4444;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  .error-hint {
+    background: rgba(255, 255, 255, 0.03);
+    padding: 0.75rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    color: #cbd5e1;
+  }
+
+  .error-hint p {
+    margin: 0 0 0.5rem 0;
+    color: #fbbf24;
+  }
+
+  .error-hint ul {
+    margin: 0;
+    padding-left: 1.25rem;
+  }
+
+  .error-hint li {
+    margin-bottom: 0.3rem;
   }
 
   .spinner {
@@ -976,3 +1076,4 @@
     to { transform: rotate(360deg); }
   }
 </style>
+

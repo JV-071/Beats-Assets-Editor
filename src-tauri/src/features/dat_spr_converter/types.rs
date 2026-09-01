@@ -69,4 +69,7 @@ pub struct ConversionResult {
     pub sprites_converted: u32,
     pub sheets_created: usize,
     pub elapsed_ms: u64,
+    pub log_path: String,
+    pub logs: Vec<String>,
 }
+

@@ -67,16 +67,69 @@ pub fn get_supported_legacy_versions() -> Vec<SupportedLegacyVersion> {
 }
 
 /// Converts legacy DAT and SPR files directly to modern assets (appearances.dat, catalog-content.json, LZMA sheets, and optional AEC)
+fn write_log_file(output_dir: &Path, logs: &[String]) -> String {
+    let log_content = logs.join("\n");
+    
+    // 1. Tenta salvar na pasta de saída
+    let out_file = output_dir.join("conversion_log.txt");
+    let _ = std::fs::create_dir_all(output_dir);
+    if let Ok(_) = std::fs::write(&out_file, &log_content) {
+        return out_file.to_string_lossy().to_string();
+    }
+
+    // 2. Fallback para diretório temporário do sistema
+    let temp_dir = std::env::temp_dir().join("CanaryStudio");
+    let _ = std::fs::create_dir_all(&temp_dir);
+    let temp_file = temp_dir.join("conversion_log.txt");
+    let _ = std::fs::write(&temp_file, &log_content);
+    temp_file.to_string_lossy().to_string()
+}
+
+/// Converts legacy DAT and SPR files directly to modern assets (appearances.dat, catalog-content.json, LZMA sheets, and optional AEC)
 #[tauri::command]
 pub async fn convert_legacy_to_assets(options: LegacyConvertOptions) -> Result<ConversionResult, String> {
     let start_time = Instant::now();
+    let mut logs: Vec<String> = Vec::new();
+    let output_path = Path::new(&options.output_dir);
 
-    log::info!("Starting legacy conversion for DAT: {:?} and SPR: {:?}", options.dat_path, options.spr_path);
+    macro_rules! log_msg {
+        ($($arg:tt)*) => {{
+            let msg = format!("[{:.3}s] {}", start_time.elapsed().as_secs_f32(), format!($($arg)*));
+            log::info!("{}", msg);
+            logs.push(msg);
+        }};
+    }
+
+    macro_rules! log_err {
+        ($($arg:tt)*) => {{
+            let msg = format!("[{:.3}s] [ERRO] {}", start_time.elapsed().as_secs_f32(), format!($($arg)*));
+            log::error!("{}", msg);
+            logs.push(msg);
+        }};
+    }
+
+    log_msg!("=== INÍCIO DA CONVERSÃO DE ARQUIVOS LEGADOS ===");
+    log_msg!("Arquivo DAT: {:?}", options.dat_path);
+    log_msg!("Arquivo SPR: {:?}", options.spr_path);
+    log_msg!("Pasta de Destino: {:?}", options.output_dir);
+    log_msg!("Opções: Extended={}, Transparência={}, FrameGroups={}, ImprovedAnimations={}, ExportAEC={}",
+        options.extended_sprites, options.transparency, options.frame_groups, options.improved_animations, options.export_aec
+    );
+
+    // Garante a criação da pasta de destino desde o início
+    if let Err(e) = std::fs::create_dir_all(output_path) {
+        let err_str = format!("Não foi possível criar a pasta de destino {:?}: {}", options.output_dir, e);
+        log_err!("{}", err_str);
+        let log_file = write_log_file(output_path, &logs);
+        return Err(format!("{}\nLog gravado em: {}", err_str, log_file));
+    }
 
     // 1. Resolve version parameters
+    log_msg!("Passo 1/6: Resolvendo versão e estrutura...");
     let version_id = options.version_id.unwrap_or(0);
     let (structure, is_extended, has_frame_groups, has_improved_animations) = if version_id > 0 {
         if let Some(v) = get_version_by_id(version_id) {
+            log_msg!("Versão selecionada: {} (Structure {})", v.name, v.structure);
             (
                 v.structure,
                 options.extended_sprites || v.default_extended,
@@ -84,6 +137,7 @@ pub async fn convert_legacy_to_assets(options: LegacyConvertOptions) -> Result<C
                 options.improved_animations || v.default_improved_animations,
             )
         } else {
+            log_msg!("Versão manual informada ID {} (Structure {})", version_id, get_structure_for_version(version_id));
             (
                 get_structure_for_version(version_id),
                 options.extended_sprites,
@@ -100,6 +154,7 @@ pub async fn convert_legacy_to_assets(options: LegacyConvertOptions) -> Result<C
             .unwrap_or((0, 0, false));
         let det = detect_version_from_signatures(dat_sig, spr_sig);
         if let Some(v) = det {
+            log_msg!("Versão auto-detectada com sucesso: {} (DAT: 0x{:X}, SPR: 0x{:X}, Structure: {})", v.name, dat_sig, spr_sig, v.structure);
             (
                 v.structure,
                 options.extended_sprites || ext || v.default_extended,
@@ -107,6 +162,7 @@ pub async fn convert_legacy_to_assets(options: LegacyConvertOptions) -> Result<C
                 options.improved_animations || v.default_improved_animations,
             )
         } else {
+            log_msg!("Assinatura não cadastrada na tabela de versões (DAT: 0x{:X}, SPR: 0x{:X}). Usando estrutura padrão.", dat_sig, spr_sig);
             (
                 if options.extended_sprites || ext { 6 } else { 5 },
                 options.extended_sprites || ext,
@@ -117,38 +173,58 @@ pub async fn convert_legacy_to_assets(options: LegacyConvertOptions) -> Result<C
     };
 
     // 2. Read and decode SPR file in parallel
-    log::info!(
-        "Reading SPR file (extended={}, transparency={})...",
-        is_extended,
-        options.transparency
-    );
-    let spr_reader = LegacySprReader::open(&options.spr_path, is_extended, options.transparency)
-        .map_err(|e| format!("Error opening SPR file: {}", e))?;
+    log_msg!("Passo 2/6: Lendo e decodificando arquivo SPR (is_extended={}, transparency={})...", is_extended, options.transparency);
+    let spr_reader = match LegacySprReader::open(&options.spr_path, is_extended, options.transparency) {
+        Ok(reader) => {
+            log_msg!("SPR aberto com sucesso. Total de sprites no cabeçalho: {}", reader.sprite_count);
+            reader
+        }
+        Err(e) => {
+            let err_str = format!("Erro ao abrir arquivo SPR ({:?}): {}. Dica: Verifique se o arquivo não está corrompido ou se a opção 'Extended Sprites' precisa ser ativada/desativada.", options.spr_path, e);
+            log_err!("{}", err_str);
+            let log_file = write_log_file(output_path, &logs);
+            return Err(format!("{}\nLog gravado em: {}", err_str, log_file));
+        }
+    };
 
-    let decoded_sprites = spr_reader
-        .decode_all_sprites()
-        .map_err(|e| format!("Error decoding SPR sprites: {}", e))?;
-    log::info!("Successfully decoded {} sprites", decoded_sprites.len());
+    let decoded_sprites = match spr_reader.decode_all_sprites() {
+        Ok(sprites) => {
+            log_msg!("Decodificação concluída com sucesso. {} sprites decodificadas em paralelo.", sprites.len());
+            sprites
+        }
+        Err(e) => {
+            let err_str = format!("Erro ao decodificar sprites do arquivo SPR: {}. Dica: Se o seu cliente for OTClient com transparência real, ative a opção 'Transparência RGBA'.", e);
+            log_err!("{}", err_str);
+            let log_file = write_log_file(output_path, &logs);
+            return Err(format!("{}\nLog gravado em: {}", err_str, log_file));
+        }
+    };
 
     // 3. Read DAT file
-    log::info!(
-        "Reading DAT file (structure={}, extended={}, frame_groups={}, improved_animations={})...",
-        structure,
-        is_extended,
-        has_frame_groups,
-        has_improved_animations
-    );
-    let dat_reader = LegacyDatReader::open(
+    log_msg!("Passo 3/6: Lendo e interpretando arquivo DAT (structure={}, extended={}, frame_groups={}, improved_animations={})...",
+        structure, is_extended, has_frame_groups, has_improved_animations);
+    let dat_reader = match LegacyDatReader::open(
         &options.dat_path,
         structure,
         is_extended,
         has_frame_groups,
         has_improved_animations,
-    )
-    .map_err(|e| format!("Error reading DAT file: {}", e))?;
+    ) {
+        Ok(reader) => {
+            log_msg!("DAT lido com sucesso: {} Objects (itens), {} Outfits, {} Effects, {} Missiles",
+                reader.object_count, reader.outfit_count, reader.effect_count, reader.missile_count);
+            reader
+        }
+        Err(e) => {
+            let err_str = format!("Erro ao ler arquivo DAT ({:?}): {}. Dica: Selecione a versão correta do cliente ou ajuste as opções de Frame Groups / Animações Avançadas.", options.dat_path, e);
+            log_err!("{}", err_str);
+            let log_file = write_log_file(output_path, &logs);
+            return Err(format!("{}\nLog gravado em: {}", err_str, log_file));
+        }
+    };
 
     // 4. Map Things to Protobuf Appearances
-    log::info!("Mapping things to Protobuf Appearances...");
+    log_msg!("Passo 4/6: Mapeando categorias e atributos para o formato Protobuf moderno...");
     let mut appearances = Appearances::default();
 
     for obj in &dat_reader.objects {
@@ -163,33 +239,65 @@ pub async fn convert_legacy_to_assets(options: LegacyConvertOptions) -> Result<C
     for missile in &dat_reader.missiles {
         appearances.missile.push(map_legacy_thing_to_appearance(missile));
     }
+    log_msg!("Mapeamento concluído: Total de {} aparências prontas.",
+        appearances.object.len() + appearances.outfit.len() + appearances.effect.len() + appearances.missile.len()
+    );
 
     // 5. Compile Sprites to Sheets & write catalog-content.json
-    log::info!("Compiling sprites to LZMA sprite sheets and generating catalog...");
-    let output_path = Path::new(&options.output_dir);
-    let (_, sheets_created) = compile_sprites_to_sheets(&decoded_sprites, output_path)
-        .map_err(|e| format!("Error compiling spritesheets: {}", e))?;
+    log_msg!("Passo 5/6: Compilando spritesheets com compressão LZMA (.cwm) e gerando catalog-content.json...");
+    let (_, sheets_created) = match compile_sprites_to_sheets(&decoded_sprites, output_path) {
+        Ok(res) => {
+            log_msg!("Spritesheets geradas com sucesso: {} folhas criadas em {:?}", res.1, output_path);
+            res
+        }
+        Err(e) => {
+            let err_str = format!("Erro ao compilar folhas de sprites LZMA: {}", e);
+            log_err!("{}", err_str);
+            let log_file = write_log_file(output_path, &logs);
+            return Err(format!("{}\nLog gravado em: {}", err_str, log_file));
+        }
+    };
 
     // 6. Write appearances.dat
-    log::info!("Writing appearances.dat...");
-    let appearances_file = write_appearances_dat(&appearances, output_path)
-        .map_err(|e| format!("Error writing appearances.dat: {}", e))?;
+    log_msg!("Passo 6/6: Serializando e gravando appearances.dat...");
+    let appearances_file = match write_appearances_dat(&appearances, output_path) {
+        Ok(path) => {
+            log_msg!("appearances.dat gravado com sucesso em {:?}", path);
+            path
+        }
+        Err(e) => {
+            let err_str = format!("Erro ao gravar appearances.dat: {}", e);
+            log_err!("{}", err_str);
+            let log_file = write_log_file(output_path, &logs);
+            return Err(format!("{}\nLog gravado em: {}", err_str, log_file));
+        }
+    };
 
     // 7. Optional AEC Export
     let mut aec_file_path = None;
     if options.export_aec {
-        log::info!("Exporting .aec bundle...");
+        log_msg!("Exportando pacote adicional .aec (bundle compatível com ObjectBuilder/Canary Studio)...");
         let proj_name = options
             .project_name
             .as_deref()
             .unwrap_or("converted_legacy_assets");
-        let aec_res = write_aec_bundle(&appearances, &decoded_sprites, output_path, proj_name)
-            .map_err(|e| format!("Error exporting AEC bundle: {}", e))?;
-        aec_file_path = Some(aec_res.to_string_lossy().to_string());
+        match write_aec_bundle(&appearances, &decoded_sprites, output_path, proj_name) {
+            Ok(aec_res) => {
+                let aec_str = aec_res.to_string_lossy().to_string();
+                log_msg!("Pacote .aec gravado com sucesso: {:?}", aec_str);
+                aec_file_path = Some(aec_str);
+            }
+            Err(e) => {
+                log_err!("Aviso: Falha ao exportar bundle AEC (os assets principais foram gerados): {}", e);
+            }
+        }
     }
 
     let elapsed = start_time.elapsed().as_millis() as u64;
-    log::info!("Conversion finished successfully in {} ms", elapsed);
+    log_msg!("=== CONVERSÃO CONCLUÍDA COM SUCESSO EM {} ms ===", elapsed);
+
+    let log_file = write_log_file(output_path, &logs);
+    log_msg!("Arquivo de log final gravado em: {:?}", log_file);
 
     Ok(ConversionResult {
         success: true,
@@ -204,5 +312,8 @@ pub async fn convert_legacy_to_assets(options: LegacyConvertOptions) -> Result<C
         sprites_converted: decoded_sprites.len() as u32,
         sheets_created,
         elapsed_ms: elapsed,
+        log_path: log_file,
+        logs,
     })
 }
+
