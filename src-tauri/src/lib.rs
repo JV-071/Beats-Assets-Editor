@@ -10,7 +10,19 @@ pub fn run() {
     // Initialize logger
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
 
+    // Global Panic Hook to prevent silent crashes and log details to disk
+    std::panic::set_hook(Box::new(|info| {
+        let msg = format!("PANIC CAUGHT BY GLOBAL HOOK: {}", info);
+        log::error!("{}", msg);
+        if let Ok(temp_dir) = std::env::var("TEMP") {
+            let crash_path = std::path::Path::new(&temp_dir).join("CanaryStudio").join("crash_log.txt");
+            let _ = std::fs::create_dir_all(crash_path.parent().unwrap());
+            let _ = std::fs::write(&crash_path, &msg);
+        }
+    }));
+
     log::info!("Starting Canary Studio Editor - EXTREME PERFORMANCE MODE");
+
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())

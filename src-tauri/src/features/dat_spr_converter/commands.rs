@@ -89,38 +89,41 @@ fn write_log_file(output_dir: &Path, logs: &[String]) -> String {
 /// Converts legacy DAT and SPR files directly to modern assets (appearances.dat, catalog-content.json, LZMA sheets, and optional AEC)
 #[tauri::command]
 pub async fn convert_legacy_to_assets(options: LegacyConvertOptions) -> Result<ConversionResult, String> {
-    // Wrap entire conversion in catch_unwind to prevent panics from crashing the app
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
-        convert_legacy_to_assets_inner(options)
-    }));
+    tokio::task::spawn_blocking(move || {
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+            convert_legacy_to_assets_inner(options)
+        }));
 
-    match result {
-        Ok(inner_result) => inner_result,
-        Err(panic_info) => {
-            let panic_msg = if let Some(s) = panic_info.downcast_ref::<&str>() {
-                s.to_string()
-            } else if let Some(s) = panic_info.downcast_ref::<String>() {
-                s.clone()
-            } else {
-                "Unknown panic (no message available)".to_string()
-            };
+        match result {
+            Ok(inner_result) => inner_result,
+            Err(panic_info) => {
+                let panic_msg = if let Some(s) = panic_info.downcast_ref::<&str>() {
+                    s.to_string()
+                } else if let Some(s) = panic_info.downcast_ref::<String>() {
+                    s.clone()
+                } else {
+                    "Unknown panic (no message available)".to_string()
+                };
 
-            let crash_log = format!(
-                "[CRASH] O conversor sofreu um panic inesperado:\n{}\n\nIsso geralmente indica dados corrompidos no arquivo .spr ou .dat.\nTente com opções diferentes (ex: Extended Sprites, Transparência RGBA).",
-                panic_msg
-            );
-            log::error!("{}", crash_log);
+                let crash_log = format!(
+                    "[CRASH] O conversor sofreu um panic inesperado:\n{}\n\nIsso geralmente indica dados corrompidos no arquivo .spr ou .dat.\nTente com opções diferentes (ex: Extended Sprites, Transparência RGBA).",
+                    panic_msg
+                );
+                log::error!("{}", crash_log);
 
-            // Emergency crash log to disk
-            if let Ok(temp_dir) = std::env::var("TEMP") {
-                let crash_path = Path::new(&temp_dir).join("CanaryStudio").join("crash_log.txt");
-                let _ = std::fs::create_dir_all(crash_path.parent().unwrap());
-                let _ = std::fs::write(&crash_path, &crash_log);
+                // Emergency crash log to disk
+                if let Ok(temp_dir) = std::env::var("TEMP") {
+                    let crash_path = Path::new(&temp_dir).join("CanaryStudio").join("crash_log.txt");
+                    let _ = std::fs::create_dir_all(crash_path.parent().unwrap());
+                    let _ = std::fs::write(&crash_path, &crash_log);
+                }
+
+                Err(crash_log)
             }
-
-            Err(crash_log)
         }
-    }
+    })
+    .await
+    .map_err(|e| format!("Erro fatal ao executar tarefa de conversão em background: {}", e))?
 }
 
 fn convert_legacy_to_assets_inner(options: LegacyConvertOptions) -> Result<ConversionResult, String> {
@@ -133,6 +136,7 @@ fn convert_legacy_to_assets_inner(options: LegacyConvertOptions) -> Result<Conve
             let msg = format!("[{:.3}s] {}", start_time.elapsed().as_secs_f32(), format!($($arg)*));
             log::info!("{}", msg);
             logs.push(msg);
+            let _ = write_log_file(output_path, &logs);
         }};
     }
 
@@ -141,8 +145,10 @@ fn convert_legacy_to_assets_inner(options: LegacyConvertOptions) -> Result<Conve
             let msg = format!("[{:.3}s] [ERRO] {}", start_time.elapsed().as_secs_f32(), format!($($arg)*));
             log::error!("{}", msg);
             logs.push(msg);
+            let _ = write_log_file(output_path, &logs);
         }};
     }
+
 
     log_msg!("=== INÍCIO DA CONVERSÃO DE ARQUIVOS LEGADOS ===");
     log_msg!("Arquivo DAT: {:?}", options.dat_path);

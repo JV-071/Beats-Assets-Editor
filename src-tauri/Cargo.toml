@@ -10,10 +10,11 @@ default-run = "Canary-Studio"
 opt-level = 3
 lto = "fat"
 codegen-units = 1
-panic = "abort"
+panic = "unwind"
 incremental = false
 debug = 0
 overflow-checks = false
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
