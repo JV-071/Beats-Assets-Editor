@@ -686,11 +686,18 @@ fn read_texture_patterns<R: Read>(
         };
         let frames = cursor.read_u8().context("Failed to read frames")?;
 
-        // Strict Bounds Check: prevents massive memory allocation on desync / corrupt data
-        if width > 8 || height > 8 || layers > 16 || pattern_x > 16 || pattern_y > 16 || pattern_z > 16 || frames > 64 {
+        let total_sprites = (width as usize)
+            .saturating_mul(height as usize)
+            .saturating_mul(layers as usize)
+            .saturating_mul(pattern_x as usize)
+            .saturating_mul(pattern_y as usize)
+            .saturating_mul(pattern_z as usize)
+            .saturating_mul(frames as usize);
+
+        if total_sprites == 0 || total_sprites > 4096 {
             return Err(anyhow!(
-                "Invalid dimensions for thing {}: {}x{}, layers={}, px={}, py={}, pz={}, frames={}",
-                thing.id, width, height, layers, pattern_x, pattern_y, pattern_z, frames
+                "Invalid sprite count for thing {}: {}x{}, layers={}, px={}, py={}, pz={}, frames={}, total_sprites={}",
+                thing.id, width, height, layers, pattern_x, pattern_y, pattern_z, frames, total_sprites
             ));
         }
 
@@ -728,20 +735,6 @@ fn read_texture_patterns<R: Read>(
             }
         }
 
-        let total_sprites = (width as usize)
-            * (height as usize)
-            * (layers as usize)
-            * (pattern_x as usize)
-            * (pattern_y as usize)
-            * (pattern_z as usize)
-            * (frames as usize);
-
-        if total_sprites > 4096 {
-            return Err(anyhow!(
-                "Thing {} has {} sprites, exceeding maximum (4096)",
-                thing.id, total_sprites
-            ));
-        }
 
         let mut sprite_ids = Vec::with_capacity(total_sprites);
         for _ in 0..total_sprites {
