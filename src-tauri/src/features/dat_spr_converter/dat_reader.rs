@@ -279,7 +279,13 @@ fn read_thing<R: Read + Seek>(
 }
 
 fn read_properties<R: Read>(cursor: &mut R, thing: &mut LegacyThingType, structure: u8) -> Result<()> {
+    let mut attr_count = 0usize;
     loop {
+        attr_count += 1;
+        if attr_count > 128 {
+            return Err(anyhow!("Thing {} has more than 128 attributes (possible corrupt or desynchronized dat)", thing.id));
+        }
+
         let flag = cursor.read_u8().context("Failed to read property flag")?;
         if flag == 0xFF {
             break;
@@ -478,11 +484,7 @@ fn parse_flags_v4<R: Read>(cursor: &mut R, t: &mut LegacyThingType, flag: u8) ->
         0x20 => { t.is_ignore_look = true; }
         0x24 => { t.is_wrappable = true; }
         0x25 => { t.is_unwrappable = true; }
-        0x27 => {
-            // has bones (8 x i16)
-            let mut buf = [0u8; 16];
-            cursor.read_exact(&mut buf)?;
-        }
+        0x27 => { t.is_usable = true; }
         _ => return Err(anyhow!("Unknown flag 0x{:02X} in struct 4", flag)),
     }
     Ok(())
@@ -537,30 +539,25 @@ fn parse_flags_v5<R: Read>(cursor: &mut R, t: &mut LegacyThingType, flag: u8) ->
             t.market.trade_as = cursor.read_u16::<LittleEndian>()?;
             t.market.show_as = cursor.read_u16::<LittleEndian>()?;
             let name_len = cursor.read_u16::<LittleEndian>()? as usize;
+            if name_len > 512 {
+                return Err(anyhow!("Invalid market name length {}", name_len));
+            }
             let mut name_bytes = vec![0u8; name_len];
             cursor.read_exact(&mut name_bytes)?;
             t.market.name = String::from_utf8_lossy(&name_bytes).to_string();
             t.market.restrict_profession = cursor.read_u16::<LittleEndian>()?;
             t.market.restrict_level = cursor.read_u16::<LittleEndian>()?;
         }
-        0x27 => {
-            let mut buf = [0u8; 16];
-            cursor.read_exact(&mut buf)?;
-        }
-        0x28 => { let _ = cursor.read_u8(); }
-        0x29 => { let _ = cursor.read_u16::<LittleEndian>(); }
-        0x2A => { let _ = cursor.read_u16::<LittleEndian>(); }
-        0x2B => { let _ = cursor.read_u16::<LittleEndian>(); }
+        0x27 => { t.is_usable = true; }
+        0x28 => { t.is_usable = true; }
         0x64 => { let _ = cursor.read_u8(); }
         0x65 => { /* not walkable */ }
         0x66 => { let _ = cursor.read_u16::<LittleEndian>(); }
         0x67 => { /* floor change */ }
-        0x68 => { let mut buf = [0u8; 16]; cursor.read_exact(&mut buf)?; }
         0x69 => { /* flag extended / otclient */ }
-        0x6A..=0x7F => { /* custom flags */ }
         0xFE => { t.is_usable = true; }
         _ => {
-            log::warn!("Ignorando flag customizada 0x{:02X} no item {}", flag, t.id);
+            log::trace!("Ignorando flag 0x{:02X} no item {}", flag, t.id);
         }
     }
     Ok(())
@@ -616,6 +613,9 @@ fn parse_flags_v6<R: Read>(cursor: &mut R, t: &mut LegacyThingType, flag: u8) ->
             t.market.trade_as = cursor.read_u16::<LittleEndian>()?;
             t.market.show_as = cursor.read_u16::<LittleEndian>()?;
             let name_len = cursor.read_u16::<LittleEndian>()? as usize;
+            if name_len > 512 {
+                return Err(anyhow!("Invalid market name length {}", name_len));
+            }
             let mut name_bytes = vec![0u8; name_len];
             cursor.read_exact(&mut name_bytes)?;
             t.market.name = String::from_utf8_lossy(&name_bytes).to_string();
@@ -626,29 +626,20 @@ fn parse_flags_v6<R: Read>(cursor: &mut R, t: &mut LegacyThingType, flag: u8) ->
         0x24 => { t.is_wrappable = true; }
         0x25 => { t.is_unwrappable = true; }
         0x26 => { t.is_top_effect = true; }
-        0x27 => {
-            let mut buf = [0u8; 16];
-            cursor.read_exact(&mut buf)?;
-        }
-        0x28 => { let _ = cursor.read_u8(); }
-        0x29 => { let _ = cursor.read_u16::<LittleEndian>(); }
-        0x2A => { let _ = cursor.read_u16::<LittleEndian>(); }
-        0x2B => { let _ = cursor.read_u16::<LittleEndian>(); }
+        0x27 => { t.is_usable = true; }
+        0x28 => { t.is_usable = true; }
         0x64 => { let _ = cursor.read_u8(); }
         0x65 => { /* not walkable */ }
         0x66 => { let _ = cursor.read_u16::<LittleEndian>(); }
         0x67 => { /* floor change */ }
-        0x68 => { let mut buf = [0u8; 16]; cursor.read_exact(&mut buf)?; }
         0x69 => { /* flag extended / otclient */ }
-        0x6A..=0x7F => { /* custom flags */ }
         0xFE => { t.is_usable = true; }
         _ => {
-            log::warn!("Ignorando flag customizada 0x{:02X} no item {}", flag, t.id);
+            log::trace!("Ignorando flag 0x{:02X} no item {}", flag, t.id);
         }
     }
     Ok(())
 }
-
 
 fn read_texture_patterns<R: Read>(
     cursor: &mut R,
@@ -663,6 +654,10 @@ fn read_texture_patterns<R: Read>(
     } else {
         1
     };
+
+    if group_count == 0 || group_count > 16 {
+        return Err(anyhow!("Invalid group count {} for thing {}", group_count, thing.id));
+    }
 
     let use_pattern_z = structure >= 3;
 
@@ -690,6 +685,14 @@ fn read_texture_patterns<R: Read>(
             1
         };
         let frames = cursor.read_u8().context("Failed to read frames")?;
+
+        // Strict Bounds Check: prevents massive memory allocation on desync / corrupt data
+        if width > 8 || height > 8 || layers > 16 || pattern_x > 16 || pattern_y > 16 || pattern_z > 16 || frames > 64 {
+            return Err(anyhow!(
+                "Invalid dimensions for thing {}: {}x{}, layers={}, px={}, py={}, pz={}, frames={}",
+                thing.id, width, height, layers, pattern_x, pattern_y, pattern_z, frames
+            ));
+        }
 
         let mut is_animation = false;
         let mut animation_mode = 0u8;
@@ -733,6 +736,13 @@ fn read_texture_patterns<R: Read>(
             * (pattern_z as usize)
             * (frames as usize);
 
+        if total_sprites > 4096 {
+            return Err(anyhow!(
+                "Thing {} has {} sprites, exceeding maximum (4096)",
+                thing.id, total_sprites
+            ));
+        }
+
         let mut sprite_ids = Vec::with_capacity(total_sprites);
         for _ in 0..total_sprites {
             let sid = if is_extended {
@@ -764,3 +774,4 @@ fn read_texture_patterns<R: Read>(
 
     Ok(())
 }
+
