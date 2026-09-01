@@ -1,9 +1,8 @@
 use anyhow::{anyhow, Context, Result};
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::fs::File;
-use std::io::{Cursor, Read, Seek, SeekFrom};
-use std::path::Path;
-
+use std::io::{BufReader, Read, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
 
 pub const SPRITE_WIDTH: u32 = 32;
 pub const SPRITE_HEIGHT: u32 = 32;
@@ -17,53 +16,59 @@ pub struct DecodedSprite {
     pub rgba: Vec<u8>,
 }
 
-/// Parsed legacy SPR file structure with offsets and file data
+/// Parsed legacy SPR file structure with offsets — file data is read on-demand from disk.
+/// Only stores the path + offset table (~4.5MB for 1.12M sprites) instead of the entire
+/// file (~500MB-1GB), preventing OOM kills on low-RAM machines.
 pub struct LegacySprReader {
     pub signature: u32,
     pub sprite_count: u32,
     pub is_extended: bool,
     pub is_transparent: bool,
     pub offsets: Vec<u32>,
-    file_bytes: Vec<u8>,
+    file_path: PathBuf,
+    file_len: u64,
 }
 
 impl LegacySprReader {
-    /// Opens and parses header of a legacy .spr file
+    /// Opens and parses header + offset table of a legacy .spr file.
+    /// Does NOT load the file content into RAM — sprites are read on-demand.
     pub fn open<P: AsRef<Path>>(path: P, is_extended: bool, is_transparent: bool) -> Result<Self> {
         let path = path.as_ref();
-        let file_bytes = std::fs::read(path).context(format!("Failed to read SPR file: {:?}", path))?;
+        let mut file = BufReader::new(
+            File::open(path).context(format!("Failed to open SPR file: {:?}", path))?
+        );
+        let file_len = file.get_ref().metadata()?.len();
 
-        if file_bytes.len() < 6 {
+        if file_len < 6 {
             return Err(anyhow!("SPR file too small (less than 6 bytes)"));
         }
 
-        let mut cursor = Cursor::new(&file_bytes);
-        let signature = cursor.read_u32::<LittleEndian>().context("Failed to read SPR signature")?;
+        let signature = file.read_u32::<LittleEndian>().context("Failed to read SPR signature")?;
 
         let (sprite_count, header_size) = if is_extended {
-            if file_bytes.len() < 8 {
+            if file_len < 8 {
                 return Err(anyhow!("Extended SPR file too small (less than 8 bytes)"));
             }
-            let count = cursor.read_u32::<LittleEndian>().context("Failed to read u32 sprite count")?;
-            (count, 8usize)
+            let count = file.read_u32::<LittleEndian>().context("Failed to read u32 sprite count")?;
+            (count, 8u64)
         } else {
-            let count = cursor.read_u16::<LittleEndian>().context("Failed to read u16 sprite count")? as u32;
-            (count, 6usize)
+            let count = file.read_u16::<LittleEndian>().context("Failed to read u16 sprite count")? as u32;
+            (count, 6u64)
         };
 
-        let required_bytes = header_size + (sprite_count as usize * 4);
-        if file_bytes.len() < required_bytes {
+        let required_bytes = header_size + (sprite_count as u64 * 4);
+        if file_len < required_bytes {
             return Err(anyhow!(
                 "SPR file truncated: expected at least {} bytes for {} sprite offsets, but file has {} bytes",
                 required_bytes,
                 sprite_count,
-                file_bytes.len()
+                file_len
             ));
         }
 
         let mut offsets = Vec::with_capacity(sprite_count as usize);
         for _ in 0..sprite_count {
-            offsets.push(cursor.read_u32::<LittleEndian>()?);
+            offsets.push(file.read_u32::<LittleEndian>()?);
         }
 
         Ok(Self {
@@ -72,7 +77,8 @@ impl LegacySprReader {
             is_extended,
             is_transparent,
             offsets,
-            file_bytes,
+            file_path: path.to_path_buf(),
+            file_len,
         })
     }
 
@@ -83,39 +89,36 @@ impl LegacySprReader {
         }
 
         let offset = self.offsets[(id - 1) as usize];
-        let rgba = decode_sprite_rle(&self.file_bytes, offset, self.is_transparent)?;
+        let mut file = BufReader::new(
+            File::open(&self.file_path).context("Failed to reopen SPR file for sprite decode")?
+        );
+        let rgba = decode_sprite_rle_from_reader(&mut file, offset, self.file_len, self.is_transparent)?;
 
         Ok(DecodedSprite { id, rgba })
     }
 
-    /// Decodes a batch of sprites by range (1-based indices) to avoid loading all sprites into memory at once.
-    /// Sprites that fail to decode are replaced with transparent (empty) sprites instead of crashing.
+    /// Decodes a batch of sprites by range (1-based indices) reading from disk on-demand.
+    /// Sprites that fail to decode are replaced with transparent (empty) sprites.
     pub fn decode_batch(&self, start_id: u32, count: u32) -> Result<Vec<DecodedSprite>> {
-        let is_transparent = self.is_transparent;
-        let file_bytes = &self.file_bytes;
         let end_id = (start_id.saturating_add(count).saturating_sub(1)).min(self.sprite_count);
         if start_id == 0 || start_id > end_id {
             return Ok(Vec::new());
         }
 
-        let sprites: Vec<DecodedSprite> = (start_id..=end_id)
-            .map(|id| {
-                let offset = self.offsets[(id - 1) as usize];
-                match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    decode_sprite_rle(file_bytes, offset, is_transparent)
-                })) {
-                    Ok(Ok(rgba)) => DecodedSprite { id, rgba },
-                    Ok(Err(_e)) => {
-                        // Decoding error — return empty transparent sprite
-                        DecodedSprite { id, rgba: vec![0u8; SPRITE_RGBA_BYTES] }
-                    }
-                    Err(_panic) => {
-                        // Panic caught — return empty transparent sprite
-                        DecodedSprite { id, rgba: vec![0u8; SPRITE_RGBA_BYTES] }
-                    }
+        let mut file = BufReader::new(
+            File::open(&self.file_path).context("Failed to reopen SPR file for batch decode")?
+        );
+
+        let mut sprites = Vec::with_capacity((end_id - start_id + 1) as usize);
+        for id in start_id..=end_id {
+            let offset = self.offsets[(id - 1) as usize];
+            match decode_sprite_rle_from_reader(&mut file, offset, self.file_len, self.is_transparent) {
+                Ok(rgba) => sprites.push(DecodedSprite { id, rgba }),
+                Err(_e) => {
+                    sprites.push(DecodedSprite { id, rgba: vec![0u8; SPRITE_RGBA_BYTES] });
                 }
-            })
-            .collect();
+            }
+        }
 
         Ok(sprites)
     }
@@ -126,44 +129,51 @@ impl LegacySprReader {
     }
 }
 
-
-
-/// Decodes RLE-compressed 32x32 sprite from file bytes at a specific offset
-pub fn decode_sprite_rle(file_bytes: &[u8], offset: u32, is_transparent: bool) -> Result<Vec<u8>> {
+/// Decodes RLE-compressed 32x32 sprite from a file reader at a specific offset
+fn decode_sprite_rle_from_reader<R: Read + Seek>(
+    reader: &mut R,
+    offset: u32,
+    file_len: u64,
+    is_transparent: bool,
+) -> Result<Vec<u8>> {
     let mut output = vec![0u8; SPRITE_RGBA_BYTES];
 
-    if offset == 0 || (offset as usize) >= file_bytes.len() {
+    if offset == 0 || (offset as u64) >= file_len {
         return Ok(output);
     }
 
-    let mut cursor = Cursor::new(file_bytes);
-    cursor.seek(SeekFrom::Start(offset as u64)).context("Failed to seek to sprite offset")?;
+    reader.seek(SeekFrom::Start(offset as u64)).context("Failed to seek to sprite offset")?;
 
     // Skip 3 bytes chroma key (R, G, B - usually 0xFF, 0x00, 0xFF)
     let mut _chroma = [0u8; 3];
-    cursor.read_exact(&mut _chroma).context("Failed to read chroma key")?;
+    reader.read_exact(&mut _chroma).context("Failed to read chroma key")?;
 
-    let data_size = cursor.read_u16::<LittleEndian>().context("Failed to read sprite data size")? as usize;
+    let data_size = reader.read_u16::<LittleEndian>().context("Failed to read sprite data size")? as usize;
     if data_size == 0 {
         return Ok(output);
     }
 
-    let start_pos = cursor.position();
+    let start_pos = offset as u64 + 5; // 3 chroma + 2 data_size
+    let mut bytes_read: usize = 0;
     let mut pixel_index: usize = 0;
 
-    while (cursor.position() - start_pos) < data_size as u64 && pixel_index < SPRITE_PIXELS {
-        let transparent_pixels = cursor.read_u16::<LittleEndian>().context("Failed to read transparent pixel count")? as usize;
-        let colored_pixels = cursor.read_u16::<LittleEndian>().context("Failed to read colored pixel count")? as usize;
+    while bytes_read < data_size && pixel_index < SPRITE_PIXELS {
+        let transparent_pixels = reader.read_u16::<LittleEndian>().context("Failed to read transparent pixel count")? as usize;
+        let colored_pixels = reader.read_u16::<LittleEndian>().context("Failed to read colored pixel count")? as usize;
+        bytes_read += 4;
 
         pixel_index = pixel_index.saturating_add(transparent_pixels);
 
         for _ in 0..colored_pixels {
-            let red = cursor.read_u8().context("Failed to read red channel")?;
-            let green = cursor.read_u8().context("Failed to read green channel")?;
-            let blue = cursor.read_u8().context("Failed to read blue channel")?;
+            let red = reader.read_u8().context("Failed to read red channel")?;
+            let green = reader.read_u8().context("Failed to read green channel")?;
+            let blue = reader.read_u8().context("Failed to read blue channel")?;
             let alpha = if is_transparent {
-                cursor.read_u8().context("Failed to read alpha channel")?
+                let a = reader.read_u8().context("Failed to read alpha channel")?;
+                bytes_read += 4;
+                a
             } else {
+                bytes_read += 3;
                 0xFF
             };
 
@@ -179,6 +189,12 @@ pub fn decode_sprite_rle(file_bytes: &[u8], offset: u32, is_transparent: bool) -
     }
 
     Ok(output)
+}
+
+/// Legacy compatibility wrapper — decodes from a byte slice (used by existing code paths)
+pub fn decode_sprite_rle(file_bytes: &[u8], offset: u32, is_transparent: bool) -> Result<Vec<u8>> {
+    let mut cursor = std::io::Cursor::new(file_bytes);
+    decode_sprite_rle_from_reader(&mut cursor, offset, file_bytes.len() as u64, is_transparent)
 }
 
 /// Helper function to inspect basic SPR header info without loading all offsets
