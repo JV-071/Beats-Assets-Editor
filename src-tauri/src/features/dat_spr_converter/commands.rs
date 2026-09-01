@@ -89,6 +89,41 @@ fn write_log_file(output_dir: &Path, logs: &[String]) -> String {
 /// Converts legacy DAT and SPR files directly to modern assets (appearances.dat, catalog-content.json, LZMA sheets, and optional AEC)
 #[tauri::command]
 pub async fn convert_legacy_to_assets(options: LegacyConvertOptions) -> Result<ConversionResult, String> {
+    // Wrap entire conversion in catch_unwind to prevent panics from crashing the app
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+        convert_legacy_to_assets_inner(options)
+    }));
+
+    match result {
+        Ok(inner_result) => inner_result,
+        Err(panic_info) => {
+            let panic_msg = if let Some(s) = panic_info.downcast_ref::<&str>() {
+                s.to_string()
+            } else if let Some(s) = panic_info.downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "Unknown panic (no message available)".to_string()
+            };
+
+            let crash_log = format!(
+                "[CRASH] O conversor sofreu um panic inesperado:\n{}\n\nIsso geralmente indica dados corrompidos no arquivo .spr ou .dat.\nTente com opções diferentes (ex: Extended Sprites, Transparência RGBA).",
+                panic_msg
+            );
+            log::error!("{}", crash_log);
+
+            // Emergency crash log to disk
+            if let Ok(temp_dir) = std::env::var("TEMP") {
+                let crash_path = Path::new(&temp_dir).join("CanaryStudio").join("crash_log.txt");
+                let _ = std::fs::create_dir_all(crash_path.parent().unwrap());
+                let _ = std::fs::write(&crash_path, &crash_log);
+            }
+
+            Err(crash_log)
+        }
+    }
+}
+
+fn convert_legacy_to_assets_inner(options: LegacyConvertOptions) -> Result<ConversionResult, String> {
     let start_time = Instant::now();
     let mut logs: Vec<String> = Vec::new();
     let output_path = Path::new(&options.output_dir);
@@ -253,8 +288,8 @@ pub async fn convert_legacy_to_assets(options: LegacyConvertOptions) -> Result<C
     let (_, sheets_created) = match compile_sprites_to_sheets_streaming(
         &spr_reader,
         output_path,
-        Some(|current_sheet, total_sheets| {
-            if current_sheet % 250 == 0 || current_sheet == total_sheets {
+        Some(|current_sheet: usize, total_sheets: usize| {
+            if current_sheet % 100 == 0 || current_sheet == total_sheets {
                 log::info!("Progresso: Folha {} de {} gerada...", current_sheet, total_sheets);
             }
         }),
@@ -314,5 +349,3 @@ pub async fn convert_legacy_to_assets(options: LegacyConvertOptions) -> Result<C
         logs,
     })
 }
-
-

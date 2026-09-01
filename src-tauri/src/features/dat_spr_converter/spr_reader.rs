@@ -1,9 +1,9 @@
 use anyhow::{anyhow, Context, Result};
 use byteorder::{LittleEndian, ReadBytesExt};
-use rayon::prelude::*;
 use std::fs::File;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::path::Path;
+
 
 pub const SPRITE_WIDTH: u32 = 32;
 pub const SPRITE_HEIGHT: u32 = 32;
@@ -88,7 +88,8 @@ impl LegacySprReader {
         Ok(DecodedSprite { id, rgba })
     }
 
-    /// Decodes a batch of sprites by range (1-based indices) to avoid loading all sprites into memory at once
+    /// Decodes a batch of sprites by range (1-based indices) to avoid loading all sprites into memory at once.
+    /// Sprites that fail to decode are replaced with transparent (empty) sprites instead of crashing.
     pub fn decode_batch(&self, start_id: u32, count: u32) -> Result<Vec<DecodedSprite>> {
         let is_transparent = self.is_transparent;
         let file_bytes = &self.file_bytes;
@@ -97,23 +98,34 @@ impl LegacySprReader {
             return Ok(Vec::new());
         }
 
-        let sprites: Result<Vec<DecodedSprite>> = (start_id..=end_id)
-            .into_par_iter()
+        let sprites: Vec<DecodedSprite> = (start_id..=end_id)
             .map(|id| {
                 let offset = self.offsets[(id - 1) as usize];
-                let rgba = decode_sprite_rle(file_bytes, offset, is_transparent)?;
-                Ok(DecodedSprite { id, rgba })
+                match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    decode_sprite_rle(file_bytes, offset, is_transparent)
+                })) {
+                    Ok(Ok(rgba)) => DecodedSprite { id, rgba },
+                    Ok(Err(_e)) => {
+                        // Decoding error — return empty transparent sprite
+                        DecodedSprite { id, rgba: vec![0u8; SPRITE_RGBA_BYTES] }
+                    }
+                    Err(_panic) => {
+                        // Panic caught — return empty transparent sprite
+                        DecodedSprite { id, rgba: vec![0u8; SPRITE_RGBA_BYTES] }
+                    }
+                }
             })
             .collect();
 
-        sprites
+        Ok(sprites)
     }
 
-    /// Decodes all sprites in parallel using Rayon (1-based indices from 1 to sprite_count)
+    /// Decodes all sprites sequentially (1-based indices from 1 to sprite_count)
     pub fn decode_all_sprites(&self) -> Result<Vec<DecodedSprite>> {
         self.decode_batch(1, self.sprite_count)
     }
 }
+
 
 
 /// Decodes RLE-compressed 32x32 sprite from file bytes at a specific offset
