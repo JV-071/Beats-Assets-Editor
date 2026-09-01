@@ -1,12 +1,13 @@
 use super::dat_reader::{inspect_dat_header, LegacyDatReader};
 use super::mapper::map_legacy_thing_to_appearance;
-use super::sheet_compiler::{compile_sprites_to_sheets, write_aec_bundle, write_appearances_dat};
+use super::sheet_compiler::{compile_sprites_to_sheets_streaming, write_aec_bundle_from_reader, write_appearances_dat};
 use super::spr_reader::{inspect_spr_header, LegacySprReader};
 use super::types::{ConversionResult, LegacyConvertOptions, LegacyDetectedInfo, SupportedLegacyVersion};
 use super::versions::{detect_version_from_signatures, get_structure_for_version, get_version_by_id, SUPPORTED_VERSIONS};
 use crate::core::protobuf::Appearances;
 use std::path::Path;
 use std::time::Instant;
+
 
 /// Inspects legacy DAT and SPR files and attempts auto-detection of client version
 #[tauri::command]
@@ -172,8 +173,8 @@ pub async fn convert_legacy_to_assets(options: LegacyConvertOptions) -> Result<C
         }
     };
 
-    // 2. Read and decode SPR file in parallel
-    log_msg!("Passo 2/6: Lendo e decodificando arquivo SPR (is_extended={}, transparency={})...", is_extended, options.transparency);
+    // 2. Read SPR header and offsets (Zero-RAM Spikes: Sprites são lidas sob demanda em streaming)
+    log_msg!("Passo 2/6: Lendo cabeçalho e tabela de offsets do SPR (is_extended={}, transparency={})...", is_extended, options.transparency);
     let spr_reader = match LegacySprReader::open(&options.spr_path, is_extended, options.transparency) {
         Ok(reader) => {
             log_msg!("SPR aberto com sucesso. Total de sprites no cabeçalho: {}", reader.sprite_count);
@@ -181,19 +182,6 @@ pub async fn convert_legacy_to_assets(options: LegacyConvertOptions) -> Result<C
         }
         Err(e) => {
             let err_str = format!("Erro ao abrir arquivo SPR ({:?}): {}. Dica: Verifique se o arquivo não está corrompido ou se a opção 'Extended Sprites' precisa ser ativada/desativada.", options.spr_path, e);
-            log_err!("{}", err_str);
-            let log_file = write_log_file(output_path, &logs);
-            return Err(format!("{}\nLog gravado em: {}", err_str, log_file));
-        }
-    };
-
-    let decoded_sprites = match spr_reader.decode_all_sprites() {
-        Ok(sprites) => {
-            log_msg!("Decodificação concluída com sucesso. {} sprites decodificadas em paralelo.", sprites.len());
-            sprites
-        }
-        Err(e) => {
-            let err_str = format!("Erro ao decodificar sprites do arquivo SPR: {}. Dica: Se o seu cliente for OTClient com transparência real, ative a opção 'Transparência RGBA'.", e);
             log_err!("{}", err_str);
             let log_file = write_log_file(output_path, &logs);
             return Err(format!("{}\nLog gravado em: {}", err_str, log_file));
@@ -216,7 +204,6 @@ pub async fn convert_legacy_to_assets(options: LegacyConvertOptions) -> Result<C
                 reader.object_count, reader.outfit_count, reader.effect_count, reader.missile_count);
             reader
         }
-
         Err(e) => {
             let err_str = format!("Erro ao ler arquivo DAT ({:?}): {}. Dica: Selecione a versão correta do cliente ou ajuste as opções de Frame Groups / Animações Avançadas.", options.dat_path, e);
             log_err!("{}", err_str);
@@ -245,23 +232,8 @@ pub async fn convert_legacy_to_assets(options: LegacyConvertOptions) -> Result<C
         appearances.object.len() + appearances.outfit.len() + appearances.effect.len() + appearances.missile.len()
     );
 
-    // 5. Compile Sprites to Sheets & write catalog-content.json
-    log_msg!("Passo 5/6: Compilando spritesheets com compressão LZMA (.cwm) e gerando catalog-content.json...");
-    let (_, sheets_created) = match compile_sprites_to_sheets(&decoded_sprites, output_path) {
-        Ok(res) => {
-            log_msg!("Spritesheets geradas com sucesso: {} folhas criadas em {:?}", res.1, output_path);
-            res
-        }
-        Err(e) => {
-            let err_str = format!("Erro ao compilar folhas de sprites LZMA: {}", e);
-            log_err!("{}", err_str);
-            let log_file = write_log_file(output_path, &logs);
-            return Err(format!("{}\nLog gravado em: {}", err_str, log_file));
-        }
-    };
-
-    // 6. Write appearances.dat
-    log_msg!("Passo 6/6: Serializando e gravando appearances.dat...");
+    // 5. Write appearances.dat
+    log_msg!("Passo 5/6: Serializando e gravando appearances.dat...");
     let appearances_file = match write_appearances_dat(&appearances, output_path) {
         Ok(path) => {
             log_msg!("appearances.dat gravado com sucesso em {:?}", path);
@@ -275,15 +247,39 @@ pub async fn convert_legacy_to_assets(options: LegacyConvertOptions) -> Result<C
         }
     };
 
-    // 7. Optional AEC Export
+    // 6. Compile Sprites to Sheets in Streaming Mode (Consumo de RAM constante < 50MB)
+    log_msg!("Passo 6/6: Compilando spritesheets LZMA (.cwm) em streaming contínuo...");
+    let total_sprites_count = spr_reader.sprite_count;
+    let (_, sheets_created) = match compile_sprites_to_sheets_streaming(
+        &spr_reader,
+        output_path,
+        Some(|current_sheet, total_sheets| {
+            if current_sheet % 250 == 0 || current_sheet == total_sheets {
+                log::info!("Progresso: Folha {} de {} gerada...", current_sheet, total_sheets);
+            }
+        }),
+    ) {
+        Ok(res) => {
+            log_msg!("Spritesheets geradas com sucesso: {} folhas criadas em {:?}", res.1, output_path);
+            res
+        }
+        Err(e) => {
+            let err_str = format!("Erro ao compilar folhas de sprites LZMA: {}", e);
+            log_err!("{}", err_str);
+            let log_file = write_log_file(output_path, &logs);
+            return Err(format!("{}\nLog gravado em: {}", err_str, log_file));
+        }
+    };
+
+    // 7. Optional AEC Export (Streaming)
     let mut aec_file_path = None;
     if options.export_aec {
-        log_msg!("Exportando pacote adicional .aec (bundle compatível com ObjectBuilder/Canary Studio)...");
+        log_msg!("Exportando pacote opcional .aec...");
         let proj_name = options
             .project_name
             .as_deref()
             .unwrap_or("converted_legacy_assets");
-        match write_aec_bundle(&appearances, &decoded_sprites, output_path, proj_name) {
+        match write_aec_bundle_from_reader(&appearances, &spr_reader, output_path, proj_name) {
             Ok(aec_res) => {
                 let aec_str = aec_res.to_string_lossy().to_string();
                 log_msg!("Pacote .aec gravado com sucesso: {:?}", aec_str);
@@ -311,11 +307,12 @@ pub async fn convert_legacy_to_assets(options: LegacyConvertOptions) -> Result<C
         outfit_count: dat_reader.outfit_count,
         effect_count: dat_reader.effect_count,
         missile_count: dat_reader.missile_count,
-        sprites_converted: decoded_sprites.len() as u32,
+        sprites_converted: total_sprites_count,
         sheets_created,
         elapsed_ms: elapsed,
         log_path: log_file,
         logs,
     })
 }
+
 

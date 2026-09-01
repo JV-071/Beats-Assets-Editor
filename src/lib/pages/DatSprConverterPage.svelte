@@ -74,9 +74,10 @@
   let transparency = $state(false);
   let frameGroups = $state(false);
   let improvedAnimations = $state(false);
-  let exportAec = $state(true);
+  let exportAec = $state(false);
   let openAfterConvert = $state(true);
   let projectName = $state("converted_legacy_assets");
+
 
   // Conversion Execution State
   let isConverting = $state(false);
@@ -418,10 +419,11 @@
           <label class="checkbox-card" class:active={exportAec}>
             <input type="checkbox" bind:checked={exportAec} />
             <div class="checkbox-info">
-              <span class="checkbox-title">Exportar Pacote .AEC</span>
-              <span class="checkbox-desc">Gera bundle .aec + companion com sprites para importação direta.</span>
+              <span class="checkbox-title">Exportar Pacote .AEC (Opcional)</span>
+              <span class="checkbox-desc">Gera bundle .aec para ObjectBuilder. (Deixe desmarcado para conversão ultrarrápida e leve).</span>
             </div>
           </label>
+
 
           <label class="checkbox-card" class:active={openAfterConvert}>
             <input type="checkbox" bind:checked={openAfterConvert} />

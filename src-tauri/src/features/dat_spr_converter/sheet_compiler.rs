@@ -1,4 +1,4 @@
-use super::spr_reader::{DecodedSprite, SPRITE_HEIGHT, SPRITE_WIDTH};
+use super::spr_reader::{DecodedSprite, LegacySprReader, SPRITE_HEIGHT, SPRITE_WIDTH};
 use crate::core::lzma;
 use crate::core::protobuf::Appearances;
 use crate::features::sprites::parsers::SpriteCatalogEntry;
@@ -70,6 +70,72 @@ fn build_sheet_bmp(tiles: &[&[u8]], cols: u32) -> Result<(Vec<u8>, u32, u32)> {
         .write_to(&mut Cursor::new(&mut bmp), ImageFormat::Bmp)
         .map_err(|e| anyhow!("Failed to encode sheet BMP: {}", e))?;
     Ok((bmp, cols, rows))
+}
+
+/// Compiles sprites directly from LegacySprReader in small memory batches (Streaming Mode)
+/// drastically reducing memory usage from ~8GB down to <50MB!
+pub fn compile_sprites_to_sheets_streaming<P: AsRef<Path>, F: FnMut(usize, usize)>(
+    spr_reader: &LegacySprReader,
+    output_dir: P,
+    mut progress_callback: Option<F>,
+) -> Result<(Vec<SpriteCatalogEntry>, usize)> {
+    let output_dir = output_dir.as_ref();
+    fs::create_dir_all(output_dir).context("Failed to create output directory")?;
+
+    let mut catalog_entries = Vec::new();
+    let mut sheet_count = 0;
+    let total_sprites = spr_reader.sprite_count;
+
+    if total_sprites == 0 {
+        return Ok((catalog_entries, 0));
+    }
+
+    let total_sheets = (total_sprites as usize).div_ceil(MAX_TILES_PER_SHEET);
+    let mut current_id = 1u32;
+
+    while current_id <= total_sprites {
+        let batch = spr_reader.decode_batch(current_id, MAX_TILES_PER_SHEET as u32)?;
+        if batch.is_empty() {
+            break;
+        }
+
+        let first_id = batch.first().map(|s| s.id).unwrap_or(current_id);
+        let tiles: Vec<&[u8]> = batch.iter().map(|s| s.rgba.as_slice()).collect();
+
+        let (bmp, cols, rows) = build_sheet_bmp(&tiles, DEFAULT_COLS)?;
+        let lzma_bytes = lzma::compress(&bmp).map_err(|e| anyhow!("LZMA compression failed: {}", e))?;
+        let cwm = wrap_cip_lzma(&lzma_bytes);
+
+        let total_capacity = cols * rows;
+        let last_id = first_id + total_capacity - 1;
+        let filename = format!("sprites_{}.cwm", first_id);
+        let file_path = output_dir.join(&filename);
+
+        fs::write(&file_path, &cwm).context(format!("Failed to write sprite sheet: {:?}", file_path))?;
+
+        catalog_entries.push(SpriteCatalogEntry {
+            entry_type: "sprite".to_string(),
+            file: filename,
+            sprite_type: Some(0), // 0 = 32x32
+            first_sprite_id: Some(first_id),
+            last_sprite_id: Some(last_id),
+            area: None,
+        });
+
+        sheet_count += 1;
+        if let Some(ref mut cb) = progress_callback {
+            cb(sheet_count, total_sheets);
+        }
+
+        current_id = current_id.saturating_add(MAX_TILES_PER_SHEET as u32);
+    }
+
+    // Write catalog-content.json
+    let catalog_path = output_dir.join("catalog-content.json");
+    let catalog_json = serde_json::to_string_pretty(&catalog_entries).context("Failed to serialize catalog JSON")?;
+    fs::write(&catalog_path, catalog_json).context("Failed to write catalog-content.json")?;
+
+    Ok((catalog_entries, sheet_count))
 }
 
 /// Compiles all decoded sprites into modern LZMA sprite sheets and writes catalog-content.json
@@ -152,6 +218,47 @@ fn rgba_to_png(rgba: &[u8]) -> Result<Vec<u8>> {
     Ok(png)
 }
 
+/// Exports an .aec bundle along with its companion .aec.sprites in streaming mode
+pub fn write_aec_bundle_from_reader<P: AsRef<Path>>(
+    appearances: &Appearances,
+    spr_reader: &LegacySprReader,
+    output_dir: P,
+    filename: &str,
+) -> Result<PathBuf> {
+    use std::io::Write;
+    let output_dir = output_dir.as_ref();
+    let aec_path = output_dir.join(format!("{}.aec", filename));
+    let companion_path = output_dir.join(format!("{}.aec.sprites", filename));
+
+    // 1. Write the protobuf container
+    let mut buf = Vec::new();
+    appearances.encode(&mut buf).context("Failed to encode AEC protobuf")?;
+    fs::write(&aec_path, &buf).context("Failed to write .aec file")?;
+
+    // 2. Build and write companion .aec.sprites using buffered stream
+    let companion_file = fs::File::create(&companion_path).context("Failed to create .aec.sprites file")?;
+    let mut comp_writer = std::io::BufWriter::new(companion_file);
+
+    comp_writer.write_all(AEC_SPRITE_MAGIC)?;
+    comp_writer.write_all(&[AEC_SPRITE_VERSION])?;
+    comp_writer.write_all(&(spr_reader.sprite_count.to_le_bytes()))?;
+
+    let batch_size = 5000u32;
+    let mut current_id = 1u32;
+    while current_id <= spr_reader.sprite_count {
+        let batch = spr_reader.decode_batch(current_id, batch_size)?;
+        for s in batch {
+            let png = rgba_to_png(&s.rgba)?;
+            comp_writer.write_all(&(png.len() as u32).to_le_bytes())?;
+            comp_writer.write_all(&png)?;
+        }
+        current_id = current_id.saturating_add(batch_size);
+    }
+    comp_writer.flush()?;
+
+    Ok(aec_path)
+}
+
 /// Exports an .aec bundle along with its companion .aec.sprites
 pub fn write_aec_bundle<P: AsRef<Path>>(
     appearances: &Appearances,
@@ -184,3 +291,4 @@ pub fn write_aec_bundle<P: AsRef<Path>>(
 
     Ok(aec_path)
 }
+

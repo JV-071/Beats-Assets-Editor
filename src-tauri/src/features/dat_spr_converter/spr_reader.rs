@@ -88,12 +88,16 @@ impl LegacySprReader {
         Ok(DecodedSprite { id, rgba })
     }
 
-    /// Decodes all sprites in parallel using Rayon (1-based indices from 1 to sprite_count)
-    pub fn decode_all_sprites(&self) -> Result<Vec<DecodedSprite>> {
+    /// Decodes a batch of sprites by range (1-based indices) to avoid loading all sprites into memory at once
+    pub fn decode_batch(&self, start_id: u32, count: u32) -> Result<Vec<DecodedSprite>> {
         let is_transparent = self.is_transparent;
         let file_bytes = &self.file_bytes;
+        let end_id = (start_id.saturating_add(count).saturating_sub(1)).min(self.sprite_count);
+        if start_id == 0 || start_id > end_id {
+            return Ok(Vec::new());
+        }
 
-        let sprites: Result<Vec<DecodedSprite>> = (1..=self.sprite_count)
+        let sprites: Result<Vec<DecodedSprite>> = (start_id..=end_id)
             .into_par_iter()
             .map(|id| {
                 let offset = self.offsets[(id - 1) as usize];
@@ -104,7 +108,13 @@ impl LegacySprReader {
 
         sprites
     }
+
+    /// Decodes all sprites in parallel using Rayon (1-based indices from 1 to sprite_count)
+    pub fn decode_all_sprites(&self) -> Result<Vec<DecodedSprite>> {
+        self.decode_batch(1, self.sprite_count)
+    }
 }
+
 
 /// Decodes RLE-compressed 32x32 sprite from file bytes at a specific offset
 pub fn decode_sprite_rle(file_bytes: &[u8], offset: u32, is_transparent: bool) -> Result<Vec<u8>> {
