@@ -45,7 +45,7 @@ pub struct LegacyDetectedInfo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SupportedLegacyVersion {
     pub id: u32,
-    pub name: String,
+    pub name: &'static str,
     pub dat_signature: u32,
     pub spr_signature: u32,
     pub structure: u8,

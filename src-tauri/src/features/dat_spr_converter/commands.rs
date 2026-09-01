@@ -27,7 +27,7 @@ pub async fn detect_legacy_files(dat_path: String, spr_path: String) -> Result<L
     let (ver_id, ver_name, suggested_extended, suggested_fg, suggested_ia) = match detected_version {
         Some(v) => (
             v.id,
-            v.name.clone(),
+            v.name.to_string(),
             v.default_extended,
             v.default_frame_groups,
             v.default_improved_animations,

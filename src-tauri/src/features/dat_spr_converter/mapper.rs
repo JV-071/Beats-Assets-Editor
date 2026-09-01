@@ -2,13 +2,13 @@ use super::dat_reader::{LegacyCategory, LegacyFrameGroup, LegacyThingType};
 use crate::core::protobuf::{
     Appearance, AppearanceFlagAutomap, AppearanceFlagBank, AppearanceFlagClothes, AppearanceFlagDefaultAction,
     AppearanceFlagHeight, AppearanceFlagHook, AppearanceFlagLenshelp, AppearanceFlagLight, AppearanceFlagMarket,
-    AppearanceFlagShift, AppearanceFlagWrite, AppearanceFlagWriteOnce, AppearanceFlags, FixedFrameGroup, FrameGroup,
+    AppearanceFlagShift, AppearanceFlagWrite, AppearanceFlagWriteOnce, AppearanceFlags, FrameGroup,
     SpriteAnimation, SpriteInfo, SpritePhase,
 };
 
 /// Maps a legacy ThingType to a modern Protocol Buffers Appearance
 pub fn map_legacy_thing_to_appearance(thing: &LegacyThingType) -> Appearance {
-    let mut appearance = Appearance {
+    Appearance {
         id: Some(thing.id),
         name: if !thing.market.name.is_empty() {
             Some(thing.market.name.as_bytes().to_vec())
@@ -24,9 +24,7 @@ pub fn map_legacy_thing_to_appearance(thing: &LegacyThingType) -> Appearance {
             .map(|(idx, fg)| map_legacy_frame_group(fg, thing.category, idx))
             .collect(),
         sprite_data: Vec::new(),
-    };
-
-    appearance
+    }
 }
 
 fn map_legacy_flags(thing: &LegacyThingType) -> AppearanceFlags {
@@ -66,7 +64,6 @@ fn map_legacy_flags(thing: &LegacyThingType) -> AppearanceFlags {
     if thing.is_writable {
         flags.write = Some(AppearanceFlagWrite {
             max_text_length: Some(thing.max_read_write_chars as u32),
-            max_text_length_once: None,
         });
     }
 
@@ -106,7 +103,7 @@ fn map_legacy_flags(thing: &LegacyThingType) -> AppearanceFlags {
 
     if thing.is_vertical || thing.is_horizontal {
         flags.hook = Some(AppearanceFlagHook {
-            r#type: Some(if thing.is_vertical { 1 } else { 2 }),
+            direction: Some(if thing.is_vertical { 1 } else { 2 }),
         });
     }
 
@@ -175,17 +172,21 @@ fn map_legacy_flags(thing: &LegacyThingType) -> AppearanceFlags {
 
     if thing.is_market_item {
         flags.market = Some(AppearanceFlagMarket {
-            category: Some(thing.market.category as u32),
+            category: Some(thing.market.category as i32),
             trade_as_object_id: Some(thing.market.trade_as as u32),
             show_as_object_id: Some(thing.market.show_as as u32),
-            restrict_to_profession: vec![thing.market.restrict_profession as u32],
-            minimum_level: Some(thing.market.restrict_level as u32),
         });
+        if thing.market.restrict_profession > 0 {
+            flags.restrict_to_vocation = vec![thing.market.restrict_profession as i32];
+        }
+        if thing.market.restrict_level > 0 {
+            flags.minimum_level = Some(thing.market.restrict_level as u32);
+        }
     }
 
     if thing.has_default_action {
         flags.default_action = Some(AppearanceFlagDefaultAction {
-            action: Some(thing.default_action as u32),
+            action: Some(thing.default_action as i32),
         });
     }
 
@@ -203,15 +204,15 @@ fn map_legacy_flags(thing: &LegacyThingType) -> AppearanceFlags {
 }
 
 fn map_legacy_frame_group(fg: &LegacyFrameGroup, category: LegacyCategory, group_idx: usize) -> FrameGroup {
-    let fixed_frame_group = match category {
+    let fixed_frame_group_id: i32 = match category {
         LegacyCategory::Outfit => {
             if fg.group_type == 0 || group_idx == 0 {
-                FixedFrameGroup::FixedFrameGroupOutfitIdle
+                0 // FIXED_FRAME_GROUP_OUTFIT_IDLE
             } else {
-                FixedFrameGroup::FixedFrameGroupOutfitMoving
+                1 // FIXED_FRAME_GROUP_OUTFIT_MOVING
             }
         }
-        _ => FixedFrameGroup::FixedFrameGroupObjectInitial,
+        _ => 2, // FIXED_FRAME_GROUP_OBJECT_INITIAL
     };
 
     let animation = if fg.is_animation && !fg.frame_durations.is_empty() {
@@ -253,7 +254,7 @@ fn map_legacy_frame_group(fg: &LegacyFrameGroup, category: LegacyCategory, group
     };
 
     FrameGroup {
-        fixed_frame_group: Some(fixed_frame_group as i32),
+        fixed_frame_group: Some(fixed_frame_group_id),
         id: Some(fg.group_type as u32),
         sprite_info: Some(sprite_info),
     }

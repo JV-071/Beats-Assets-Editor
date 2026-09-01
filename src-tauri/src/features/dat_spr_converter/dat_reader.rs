@@ -1,12 +1,12 @@
 use anyhow::{anyhow, Context, Result};
 use byteorder::{LittleEndian, ReadBytesExt};
-use std::collections::HashMap;
 use std::fs::File;
-use std::io::{Cursor, Read, Seek, SeekFrom};
+use std::io::{Cursor, Read, Seek};
 use std::path::Path;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum LegacyCategory {
+    #[default]
     Item,
     Outfit,
     Effect,
