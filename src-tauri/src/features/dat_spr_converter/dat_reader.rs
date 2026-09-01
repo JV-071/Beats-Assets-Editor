@@ -162,7 +162,7 @@ impl LegacyDatReader {
             (if structure == 6 { 5 } else { 6 }, false, false),
         ];
 
-        let mut last_error = anyhow!("Falha ao ler DAT");
+        let mut first_error: Option<anyhow::Error> = None;
         for (struct_candidate, fg_candidate, ia_candidate) in candidates {
             match Self::try_parse_bytes(&file_bytes, struct_candidate, is_extended, fg_candidate, ia_candidate) {
                 Ok(reader) => {
@@ -173,13 +173,16 @@ impl LegacyDatReader {
                     return Ok(reader);
                 }
                 Err(e) => {
-                    last_error = e;
+                    if first_error.is_none() {
+                        first_error = Some(anyhow!("Tentativa principal (structure={}, fg={}, ia={}) falhou: {}", struct_candidate, fg_candidate, ia_candidate, e));
+                    }
                 }
             }
         }
 
-        Err(last_error)
+        Err(first_error.unwrap_or_else(|| anyhow!("Falha ao ler DAT em todas as combinações de estrutura")))
     }
+
 
     fn try_parse_bytes(
         file_bytes: &[u8],
@@ -544,7 +547,21 @@ fn parse_flags_v5<R: Read>(cursor: &mut R, t: &mut LegacyThingType, flag: u8) ->
             let mut buf = [0u8; 16];
             cursor.read_exact(&mut buf)?;
         }
-        _ => return Err(anyhow!("Unknown flag 0x{:02X} in struct 5", flag)),
+        0x28 => { let _ = cursor.read_u8(); }
+        0x29 => { let _ = cursor.read_u16::<LittleEndian>(); }
+        0x2A => { let _ = cursor.read_u16::<LittleEndian>(); }
+        0x2B => { let _ = cursor.read_u16::<LittleEndian>(); }
+        0x64 => { let _ = cursor.read_u8(); }
+        0x65 => { /* not walkable */ }
+        0x66 => { let _ = cursor.read_u16::<LittleEndian>(); }
+        0x67 => { /* floor change */ }
+        0x68 => { let mut buf = [0u8; 16]; cursor.read_exact(&mut buf)?; }
+        0x69 => { /* flag extended / otclient */ }
+        0x6A..=0x7F => { /* custom flags */ }
+        0xFE => { t.is_usable = true; }
+        _ => {
+            log::warn!("Ignorando flag customizada 0x{:02X} no item {}", flag, t.id);
+        }
     }
     Ok(())
 }
@@ -613,11 +630,25 @@ fn parse_flags_v6<R: Read>(cursor: &mut R, t: &mut LegacyThingType, flag: u8) ->
             let mut buf = [0u8; 16];
             cursor.read_exact(&mut buf)?;
         }
+        0x28 => { let _ = cursor.read_u8(); }
+        0x29 => { let _ = cursor.read_u16::<LittleEndian>(); }
+        0x2A => { let _ = cursor.read_u16::<LittleEndian>(); }
+        0x2B => { let _ = cursor.read_u16::<LittleEndian>(); }
+        0x64 => { let _ = cursor.read_u8(); }
+        0x65 => { /* not walkable */ }
+        0x66 => { let _ = cursor.read_u16::<LittleEndian>(); }
+        0x67 => { /* floor change */ }
+        0x68 => { let mut buf = [0u8; 16]; cursor.read_exact(&mut buf)?; }
+        0x69 => { /* flag extended / otclient */ }
+        0x6A..=0x7F => { /* custom flags */ }
         0xFE => { t.is_usable = true; }
-        _ => return Err(anyhow!("Unknown flag 0x{:02X} in struct 6", flag)),
+        _ => {
+            log::warn!("Ignorando flag customizada 0x{:02X} no item {}", flag, t.id);
+        }
     }
     Ok(())
 }
+
 
 fn read_texture_patterns<R: Read>(
     cursor: &mut R,
