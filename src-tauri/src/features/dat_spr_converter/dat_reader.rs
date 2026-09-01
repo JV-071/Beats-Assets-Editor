@@ -548,22 +548,15 @@ fn parse_flags_v5<R: Read>(cursor: &mut R, t: &mut LegacyThingType, flag: u8) ->
             t.market.restrict_profession = cursor.read_u16::<LittleEndian>()?;
             t.market.restrict_level = cursor.read_u16::<LittleEndian>()?;
         }
-        0x27 => {
-            // has bones (8 x i16)
-            let mut buf = [0u8; 16];
-            cursor.read_exact(&mut buf)?;
-        }
-        0x28 => { let _ = cursor.read_u8(); }
-        0x29 => { let _ = cursor.read_u16::<LittleEndian>(); }
-        0x2A => { let _ = cursor.read_u16::<LittleEndian>(); }
-        0x2B => { let _ = cursor.read_u16::<LittleEndian>(); }
+        0x27 => { t.is_usable = true; }
+        0x28..=0x3F => { /* custom flags without data */ }
         0x64 => { let _ = cursor.read_u8(); }
         0x65 => { /* not walkable */ }
         0x66 => { let _ = cursor.read_u16::<LittleEndian>(); }
         0x67 => { /* floor change */ }
-        0x68 => { let mut buf = [0u8; 16]; cursor.read_exact(&mut buf)?; }
+        0x68 => { /* custom flag without data */ }
         0x69 => { /* flag extended / otclient */ }
-        0x6A..=0x7F => { /* custom flags without data */ }
+        0x6A..=0xFD => { /* custom flags without data */ }
         0xFE => { t.is_usable = true; }
         _ => {
             log::trace!("Ignorando flag 0x{:02X} no item {}", flag, t.id);
@@ -635,22 +628,15 @@ fn parse_flags_v6<R: Read>(cursor: &mut R, t: &mut LegacyThingType, flag: u8) ->
         0x24 => { t.is_wrappable = true; }
         0x25 => { t.is_unwrappable = true; }
         0x26 => { t.is_top_effect = true; }
-        0x27 => {
-            // has bones (8 x i16)
-            let mut buf = [0u8; 16];
-            cursor.read_exact(&mut buf)?;
-        }
-        0x28 => { let _ = cursor.read_u8(); }
-        0x29 => { let _ = cursor.read_u16::<LittleEndian>(); }
-        0x2A => { let _ = cursor.read_u16::<LittleEndian>(); }
-        0x2B => { let _ = cursor.read_u16::<LittleEndian>(); }
+        0x27 => { t.is_usable = true; }
+        0x28..=0x3F => { /* custom flags without data */ }
         0x64 => { let _ = cursor.read_u8(); }
         0x65 => { /* not walkable */ }
         0x66 => { let _ = cursor.read_u16::<LittleEndian>(); }
         0x67 => { /* floor change */ }
-        0x68 => { let mut buf = [0u8; 16]; cursor.read_exact(&mut buf)?; }
+        0x68 => { /* custom flag without data */ }
         0x69 => { /* flag extended / otclient */ }
-        0x6A..=0x7F => { /* custom flags without data */ }
+        0x6A..=0xFD => { /* custom flags without data */ }
         0xFE => { t.is_usable = true; }
         _ => {
             log::trace!("Ignorando flag 0x{:02X} no item {}", flag, t.id);
@@ -668,12 +654,13 @@ fn read_texture_patterns<R: Read>(
     has_improved_animations: bool,
 ) -> Result<()> {
     let group_count = if has_frame_groups && thing.category == LegacyCategory::Outfit {
-        cursor.read_u8().context("Failed to read group count")?
+        let count = cursor.read_u8().context("Failed to read group count")?;
+        if count == 0 { 1 } else { count }
     } else {
         1
     };
 
-    if group_count == 0 || group_count > 16 {
+    if group_count > 4 {
         return Err(anyhow!("Invalid group count {} for thing {}", group_count, thing.id));
     }
 
