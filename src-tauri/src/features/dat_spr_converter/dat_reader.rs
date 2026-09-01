@@ -151,7 +151,44 @@ impl LegacyDatReader {
             return Err(anyhow!("DAT file too small (less than 12 bytes)"));
         }
 
-        let mut cursor = Cursor::new(&file_bytes);
+        // Tenta primeiro a configuração solicitada
+        let candidates = vec![
+            (structure, has_frame_groups, has_improved_animations),
+            (structure, has_frame_groups, false),
+            (structure, false, false),
+            (structure, false, true),
+            // Fallbacks de estrutura alternativa (se 6, tenta 5; se 5, tenta 6)
+            (if structure == 6 { 5 } else { 6 }, has_frame_groups, false),
+            (if structure == 6 { 5 } else { 6 }, false, false),
+        ];
+
+        let mut last_error = anyhow!("Falha ao ler DAT");
+        for (struct_candidate, fg_candidate, ia_candidate) in candidates {
+            match Self::try_parse_bytes(&file_bytes, struct_candidate, is_extended, fg_candidate, ia_candidate) {
+                Ok(reader) => {
+                    log::info!(
+                        "DAT interpretado com sucesso (structure={}, extended={}, frame_groups={}, improved_animations={})",
+                        struct_candidate, is_extended, fg_candidate, ia_candidate
+                    );
+                    return Ok(reader);
+                }
+                Err(e) => {
+                    last_error = e;
+                }
+            }
+        }
+
+        Err(last_error)
+    }
+
+    fn try_parse_bytes(
+        file_bytes: &[u8],
+        structure: u8,
+        is_extended: bool,
+        has_frame_groups: bool,
+        has_improved_animations: bool,
+    ) -> Result<Self> {
+        let mut cursor = Cursor::new(file_bytes);
         let signature = cursor.read_u32::<LittleEndian>().context("Failed to read signature")?;
         let object_count = cursor.read_u16::<LittleEndian>().context("Failed to read object count")? as u32;
         let outfit_count = cursor.read_u16::<LittleEndian>().context("Failed to read outfit count")? as u32;
@@ -198,6 +235,7 @@ impl LegacyDatReader {
             missiles,
         })
     }
+
 }
 
 pub fn inspect_dat_header<P: AsRef<Path>>(path: P) -> Result<(u32, u32, u32, u32, u32)> {

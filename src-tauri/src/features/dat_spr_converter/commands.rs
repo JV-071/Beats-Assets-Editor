@@ -211,10 +211,12 @@ pub async fn convert_legacy_to_assets(options: LegacyConvertOptions) -> Result<C
         has_improved_animations,
     ) {
         Ok(reader) => {
-            log_msg!("DAT lido com sucesso: {} Objects (itens), {} Outfits, {} Effects, {} Missiles",
+            log_msg!("DAT lido com sucesso (Structure {}, FrameGroups: {}, ImprovedAnimations: {}): {} Objects (itens), {} Outfits, {} Effects, {} Missiles",
+                reader.structure, reader.has_frame_groups, reader.has_improved_animations,
                 reader.object_count, reader.outfit_count, reader.effect_count, reader.missile_count);
             reader
         }
+
         Err(e) => {
             let err_str = format!("Erro ao ler arquivo DAT ({:?}): {}. Dica: Selecione a versão correta do cliente ou ajuste as opções de Frame Groups / Animações Avançadas.", options.dat_path, e);
             log_err!("{}", err_str);
