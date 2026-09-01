@@ -43,7 +43,7 @@ function createAssetsState() {
         currentPage: 0,
         pageSize: 100,
         totalItems: 0,
-        viewMode: 'categories' as 'categories' | 'grid' | 'staticdata' | 'rcc' | 'qm' | 'proficiency' | 'dat-merge' | 'minimap' | 'client-config',
+        viewMode: 'categories' as 'categories' | 'grid' | 'staticdata' | 'rcc' | 'qm' | 'proficiency' | 'dat-merge' | 'minimap' | 'client-config' | 'dat-spr-converter',
         currentStaticDataType: 'creatures' as StaticDataType,
         isLoading: false,
         loadingProgress: 0,
@@ -112,4 +112,8 @@ export function selectMinimapMode() {
 
 export function selectClientConfigMode() {
     assetsState.viewMode = 'client-config';
+}
+
+export function selectDatSprConverterMode() {
+    assetsState.viewMode = 'dat-spr-converter';
 }

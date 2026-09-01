@@ -4,6 +4,7 @@
 pub mod appearances;
 pub mod client_config;
 pub mod dat_merge;
+pub mod dat_spr_converter;
 pub mod minimap;
 pub mod monsters;
 pub mod npcs;

@@ -7,6 +7,7 @@
     selectQmMode,
     selectProficiencyMode,
     selectDatMergeMode,
+    selectDatSprConverterMode,
     selectMinimapMode,
     selectClientConfigMode,
   } from "../../stores/assetsState.svelte";
@@ -408,6 +409,14 @@
         >
           <span class="subcat-icon">🔀</span>
           <span class="subcat-name">DAT Merge</span>
+        </button>
+        <button
+          type="button"
+          class="subcategory-card"
+          onclick={selectDatSprConverterMode}
+        >
+          <span class="subcat-icon">🔄</span>
+          <span class="subcat-name">Conversor .DAT & .SPR</span>
         </button>
         <button
           type="button"

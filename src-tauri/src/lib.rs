@@ -262,6 +262,10 @@ pub fn run() {
             features::client_config::commands::battleye::set_battleye_enabled,
             features::client_config::commands::rsa::get_rsa_modulus,
             features::client_config::commands::rsa::set_rsa_modulus,
+            // Legacy DAT/SPR Converter API
+            features::dat_spr_converter::commands::detect_legacy_files,
+            features::dat_spr_converter::commands::get_supported_legacy_versions,
+            features::dat_spr_converter::commands::convert_legacy_to_assets,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

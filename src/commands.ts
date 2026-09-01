@@ -213,6 +213,11 @@ export const COMMANDS = {
   EXECUTE_STATICDATA_MERGE: 'execute_staticdata_merge',
   SAVE_ALL_MERGE: 'save_all_merge',
 
+  // Legacy DAT/SPR Converter Commands
+  DETECT_LEGACY_FILES: 'detect_legacy_files',
+  GET_SUPPORTED_LEGACY_VERSIONS: 'get_supported_legacy_versions',
+  CONVERT_LEGACY_TO_ASSETS: 'convert_legacy_to_assets',
+
   // QM Translation Editor Commands
   QM_FIND_FILES: 'qm_find_files',
   QM_LOAD: 'qm_load',

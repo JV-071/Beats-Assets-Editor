@@ -296,15 +296,21 @@
           {/if}
         </button>
 
-        <!-- Map Editor -->
-        <!-- <button type="button" class="launcher-option disabled" disabled>
-          <div class="launcher-option-icon">🗺️</div>
-          <h3>{translate("launcher.map.title")}</h3>
-          <p>{translate("launcher.map.desc")}</p>
-          <span class="launcher-option-badge upcoming"
-            >{translate("launcher.status.upcoming")}</span
-          >
-        </button> -->
+        <!-- DAT/SPR Converter -->
+        <button
+          type="button"
+          class="launcher-option"
+          onclick={() => {
+            assetsState.viewMode = 'dat-spr-converter';
+            appState.currentView = 'assets-editor';
+          }}
+          title="Converter arquivos .DAT e .SPR legados para Assets Modernos"
+        >
+          <div class="launcher-option-icon">🔄</div>
+          <h3>Conversor .DAT & .SPR</h3>
+          <p>Converta clientes legados (7.10 - 10.99+) para formato de assets moderno.</p>
+          <span class="launcher-option-badge active">Novo</span>
+        </button>
       </div>
 
       <!-- Configurations -->
