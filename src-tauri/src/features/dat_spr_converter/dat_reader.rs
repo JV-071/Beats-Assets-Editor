@@ -205,9 +205,41 @@ impl LegacyDatReader {
             objects.push(thing);
         }
 
+        let item_end_pos = cursor.position();
+        log::info!(
+            "[Parser] {} itens lidos com sucesso. Posição no arquivo: {} (0x{:X})",
+            objects.len(),
+            item_end_pos,
+            item_end_pos
+        );
+
         let mut outfits = Vec::with_capacity(outfit_count as usize);
         for id in 1..=outfit_count {
-            let thing = read_thing(&mut cursor, id, LegacyCategory::Outfit, structure, is_extended, has_frame_groups, has_improved_animations)?;
+            let start_pos = cursor.position();
+            let thing = match read_thing(&mut cursor, id, LegacyCategory::Outfit, structure, is_extended, has_frame_groups, has_improved_animations) {
+                Ok(t) => t,
+                Err(e) => {
+                    log::warn!(
+                        "[Parser] Falha no Outfit {} na posição {} (0x{:X}): {}",
+                        id,
+                        start_pos,
+                        start_pos,
+                        e
+                    );
+                    return Err(e);
+                }
+            };
+            if id <= 5 {
+                log::info!(
+                    "[Parser] Outfit {} lido com sucesso (pos {}..{}): groups={}, layers={}, frames={}",
+                    id,
+                    start_pos,
+                    cursor.position(),
+                    thing.frame_groups.len(),
+                    thing.frame_groups.first().map(|g| g.layers).unwrap_or(0),
+                    thing.frame_groups.first().map(|g| g.frames).unwrap_or(0)
+                );
+            }
             outfits.push(thing);
         }
 
@@ -281,15 +313,24 @@ fn read_thing<R: Read + Seek>(
 
 fn read_properties<R: Read>(cursor: &mut R, thing: &mut LegacyThingType, structure: u8) -> Result<()> {
     let mut attr_count = 0usize;
+    let mut flags_read = Vec::new();
     loop {
         attr_count += 1;
         if attr_count > 128 {
-            return Err(anyhow!("Thing {} has more than 128 attributes (possible corrupt or desynchronized dat)", thing.id));
+            return Err(anyhow!(
+                "Thing {} ({:?}) has more than 128 attributes. First flags: {:02X?}",
+                thing.id,
+                thing.category,
+                &flags_read[..16.min(flags_read.len())]
+            ));
         }
 
         let flag = cursor.read_u8().context("Failed to read property flag")?;
         if flag == 0xFF {
             break;
+        }
+        if flags_read.len() < 32 {
+            flags_read.push(flag);
         }
 
         match structure {
