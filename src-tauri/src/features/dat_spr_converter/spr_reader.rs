@@ -153,7 +153,6 @@ fn decode_sprite_rle_from_reader<R: Read + Seek>(
         return Ok(output);
     }
 
-    let start_pos = offset as u64 + 5; // 3 chroma + 2 data_size
     let mut bytes_read: usize = 0;
     let mut pixel_index: usize = 0;
 

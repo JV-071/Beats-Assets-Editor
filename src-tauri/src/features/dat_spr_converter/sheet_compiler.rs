@@ -5,9 +5,11 @@ use crate::features::sprites::parsers::SpriteCatalogEntry;
 use anyhow::{anyhow, Context, Result};
 use image::{DynamicImage, ImageBuffer, ImageFormat, Rgba};
 use prost::Message;
+use rayon::prelude::*;
 use std::fs;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 const DEFAULT_COLS: u32 = 12;
 const DEFAULT_ROWS_PER_SHEET: u32 = 32;
