@@ -95,45 +95,62 @@ pub fn compile_sprites_to_sheets_streaming<P: AsRef<Path>, F: Fn(usize, usize) +
 
     let sheet_indices: Vec<usize> = (0..total_sheets).collect();
 
-    let catalog_entries: Result<Vec<SpriteCatalogEntry>> = sheet_indices
-        .into_par_iter()
-        .map(|sheet_idx| {
-            let first_id = 1 + (sheet_idx * MAX_TILES_PER_SHEET) as u32;
-            let batch = spr_reader.decode_batch(first_id, MAX_TILES_PER_SHEET as u32)?;
-            if batch.is_empty() {
-                return Ok(None);
-            }
+    // Reserva 1 núcleo para o Windows e a interface gráfica (evita travamento do sistema)
+    let available_threads = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4);
+    let worker_threads = if available_threads > 2 {
+        available_threads - 1
+    } else {
+        available_threads
+    };
 
-            let actual_first_id = batch.first().map(|s| s.id).unwrap_or(first_id);
-            let tiles: Vec<&[u8]> = batch.iter().map(|s| s.rgba.as_slice()).collect();
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(worker_threads)
+        .build()
+        .map_err(|e| anyhow!("Failed to build worker thread pool: {}", e))?;
 
-            let (bmp, cols, rows) = build_sheet_bmp(&tiles, DEFAULT_COLS)?;
-            let lzma_bytes = lzma::compress(&bmp).map_err(|e| anyhow!("LZMA compression failed: {}", e))?;
-            let cwm = wrap_cip_lzma(&lzma_bytes);
+    let catalog_entries: Result<Vec<SpriteCatalogEntry>> = pool.install(|| {
+        sheet_indices
+            .into_par_iter()
+            .map(|sheet_idx| {
+                let first_id = 1 + (sheet_idx * MAX_TILES_PER_SHEET) as u32;
+                let batch = spr_reader.decode_batch(first_id, MAX_TILES_PER_SHEET as u32)?;
+                if batch.is_empty() {
+                    return Ok(None);
+                }
 
-            let total_capacity = cols * rows;
-            let last_id = actual_first_id + total_capacity - 1;
-            let filename = format!("sprites_{}.cwm", actual_first_id);
-            let file_path = output_dir.join(&filename);
+                let actual_first_id = batch.first().map(|s| s.id).unwrap_or(first_id);
+                let tiles: Vec<&[u8]> = batch.iter().map(|s| s.rgba.as_slice()).collect();
 
-            fs::write(&file_path, &cwm).context(format!("Failed to write sprite sheet: {:?}", file_path))?;
+                let (bmp, cols, rows) = build_sheet_bmp(&tiles, DEFAULT_COLS)?;
+                let lzma_bytes = lzma::compress(&bmp).map_err(|e| anyhow!("LZMA compression failed: {}", e))?;
+                let cwm = wrap_cip_lzma(&lzma_bytes);
 
-            let finished = completed_counter.fetch_add(1, Ordering::Relaxed) + 1;
-            if let Some(ref cb) = progress_callback {
-                cb(finished, total_sheets);
-            }
+                let total_capacity = cols * rows;
+                let last_id = actual_first_id + total_capacity - 1;
+                let filename = format!("sprites_{}.cwm", actual_first_id);
+                let file_path = output_dir.join(&filename);
 
-            Ok(Some(SpriteCatalogEntry {
-                entry_type: "sprite".to_string(),
-                file: filename,
-                sprite_type: Some(0), // 0 = 32x32
-                first_sprite_id: Some(actual_first_id),
-                last_sprite_id: Some(last_id),
-                area: None,
-            }))
-        })
-        .filter_map(|res| res.transpose())
-        .collect();
+                fs::write(&file_path, &cwm).context(format!("Failed to write sprite sheet: {:?}", file_path))?;
+
+                let finished = completed_counter.fetch_add(1, Ordering::Relaxed) + 1;
+                if let Some(ref cb) = progress_callback {
+                    cb(finished, total_sheets);
+                }
+
+                Ok(Some(SpriteCatalogEntry {
+                    entry_type: "sprite".to_string(),
+                    file: filename,
+                    sprite_type: Some(0), // 0 = 32x32
+                    first_sprite_id: Some(actual_first_id),
+                    last_sprite_id: Some(last_id),
+                    area: None,
+                }))
+            })
+            .filter_map(|res| res.transpose())
+            .collect()
+    });
 
     let catalog_entries = catalog_entries?;
     let sheet_count = catalog_entries.len();
