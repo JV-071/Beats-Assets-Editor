@@ -131,7 +131,7 @@ pub fn compile_sprites_to_sheets_streaming<P: AsRef<Path>, F: Fn(usize, usize) +
 
                 let total_capacity = cols * rows;
                 let last_id = actual_first_id + total_capacity - 1;
-                let filename = format!("sprites_{}.cwm", actual_first_id);
+                let filename = format!("sprites_{}.bmp.lzma", actual_first_id);
                 let file_path = output_dir.join(&filename);
 
                 fs::write(&file_path, &cwm).context(format!("Failed to write sprite sheet: {:?}", file_path))?;
@@ -193,7 +193,7 @@ pub fn compile_sprites_to_sheets<P: AsRef<Path>>(
 
         let total_capacity = cols * rows;
         let last_id = first_id + total_capacity - 1;
-        let filename = format!("sprites_{}.cwm", first_id);
+        let filename = format!("sprites_{}.bmp.lzma", first_id);
         let file_path = output_dir.join(&filename);
 
         fs::write(&file_path, &cwm).context(format!("Failed to write sprite sheet: {:?}", file_path))?;

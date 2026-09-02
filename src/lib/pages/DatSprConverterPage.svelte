@@ -532,7 +532,7 @@
           </div>
           <div class="result-body">
             <p><strong>Tempo decorrido:</strong> {(conversionResult.elapsed_ms / 1000).toFixed(2)}s</p>
-            <p><strong>Sprites compiladas:</strong> {conversionResult.sprites_converted.toLocaleString()} em {conversionResult.sheets_created} folhas LZMA (.cwm)</p>
+            <p><strong>Sprites compiladas:</strong> {conversionResult.sprites_converted.toLocaleString()} em {conversionResult.sheets_created} folhas LZMA (.bmp.lzma)</p>
             <p><strong>Appearances salvas:</strong> {conversionResult.appearances_path}</p>
             {#if conversionResult.aec_path}
               <p><strong>Pacote .AEC gerado:</strong> {conversionResult.aec_path}</p>

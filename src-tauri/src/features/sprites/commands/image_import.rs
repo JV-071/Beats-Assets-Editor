@@ -301,7 +301,7 @@ pub async fn compile_imported_sprites(assets_dir: String, catalog_path: String, 
         let first = next_id;
         let total = cols * rows;
         let last = first.checked_add(total - 1).ok_or_else(|| "Sprite id overflow".to_string())?;
-        let filename = format!("custom_imported_{}.cwm", first);
+        let filename = format!("custom_imported_{}.bmp.lzma", first);
 
         std::fs::write(Path::new(&assets_dir).join(&filename), &cwm).map_err(|e| format!("Failed to write sheet: {}", e))?;
 
@@ -423,8 +423,8 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let first_id = 5000u32;
         let last_id = first_id + cols * rows - 1;
-        std::fs::write(dir.join("custom.cwm"), &cwm).unwrap();
-        let catalog = format!(r#"[{{"type":"sprite","file":"custom.cwm","spritetype":0,"firstspriteid":{},"lastspriteid":{}}}]"#, first_id, last_id);
+        std::fs::write(dir.join("custom.bmp.lzma"), &cwm).unwrap();
+        let catalog = format!(r#"[{{"type":"sprite","file":"custom.bmp.lzma","spritetype":0,"firstspriteid":{},"lastspriteid":{}}}]"#, first_id, last_id);
         let catalog_path = dir.join("catalog-content.json");
         std::fs::write(&catalog_path, catalog).unwrap();
 
@@ -455,9 +455,9 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let first_id = 7000u32;
         let last_id = first_id + cols * rows - 1;
-        std::fs::write(dir.join("custom.cwm"), &cwm).unwrap();
+        std::fs::write(dir.join("custom.bmp.lzma"), &cwm).unwrap();
         // spritetype:3 == 64x64, matching what compile_imported_sprites writes.
-        let catalog = format!(r#"[{{"type":"sprite","file":"custom.cwm","spritetype":3,"firstspriteid":{},"lastspriteid":{}}}]"#, first_id, last_id);
+        let catalog = format!(r#"[{{"type":"sprite","file":"custom.bmp.lzma","spritetype":3,"firstspriteid":{},"lastspriteid":{}}}]"#, first_id, last_id);
         let catalog_path = dir.join("catalog-content.json");
         std::fs::write(&catalog_path, catalog).unwrap();
 

@@ -289,7 +289,7 @@ fn convert_legacy_to_assets_inner(options: LegacyConvertOptions) -> Result<Conve
     };
 
     // 6. Compile Sprites to Sheets in Streaming Mode (Consumo de RAM constante < 50MB)
-    log_msg!("Passo 6/6: Compilando spritesheets LZMA (.cwm) em streaming contínuo...");
+    log_msg!("Passo 6/6: Compilando spritesheets LZMA (.bmp.lzma) em streaming contínuo...");
     let total_sprites_count = spr_reader.sprite_count;
     let (_, sheets_created) = match compile_sprites_to_sheets_streaming(
         &spr_reader,
