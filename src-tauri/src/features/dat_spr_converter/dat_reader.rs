@@ -550,7 +550,11 @@ fn parse_flags_v5<R: Read>(cursor: &mut R, t: &mut LegacyThingType, flag: u8) ->
             t.market.restrict_level = cursor.read_u16::<LittleEndian>()?;
         }
         0x27 => { t.is_usable = true; }
-        0x28..=0x3F => { /* custom flags without data */ }
+        0x28 => { let _ = cursor.read_u8(); }
+        0x29 => { let _ = cursor.read_u16::<LittleEndian>(); }
+        0x2A => { let _ = cursor.read_u16::<LittleEndian>(); }
+        0x2B => { let _ = cursor.read_u16::<LittleEndian>(); }
+        0x2C..=0x3F => { /* custom flags without data */ }
         0x64 => { let _ = cursor.read_u8(); }
         0x65 => { /* not walkable */ }
         0x66 => { let _ = cursor.read_u16::<LittleEndian>(); }
@@ -630,7 +634,11 @@ fn parse_flags_v6<R: Read>(cursor: &mut R, t: &mut LegacyThingType, flag: u8) ->
         0x25 => { t.is_unwrappable = true; }
         0x26 => { t.is_top_effect = true; }
         0x27 => { t.is_usable = true; }
-        0x28..=0x3F => { /* custom flags without data */ }
+        0x28 => { let _ = cursor.read_u8(); }
+        0x29 => { let _ = cursor.read_u16::<LittleEndian>(); }
+        0x2A => { let _ = cursor.read_u16::<LittleEndian>(); }
+        0x2B => { let _ = cursor.read_u16::<LittleEndian>(); }
+        0x2C..=0x3F => { /* custom flags without data */ }
         0x64 => { let _ = cursor.read_u8(); }
         0x65 => { /* not walkable */ }
         0x66 => { let _ = cursor.read_u16::<LittleEndian>(); }
