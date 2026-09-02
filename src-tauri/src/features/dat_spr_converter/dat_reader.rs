@@ -173,6 +173,7 @@ impl LegacyDatReader {
                     return Ok(reader);
                 }
                 Err(e) => {
+                    log::debug!("Candidato (structure={}, fg={}, ia={}) falhou: {}", struct_candidate, fg_candidate, ia_candidate, e);
                     if first_error.is_none() {
                         first_error = Some(anyhow!("Tentativa principal (structure={}, fg={}, ia={}) falhou: {}", struct_candidate, fg_candidate, ia_candidate, e));
                     }
@@ -714,7 +715,7 @@ fn read_texture_patterns<R: Read>(
 
         if frames > 1 {
             is_animation = true;
-            if has_improved_animations {
+            if has_improved_animations && thing.category == LegacyCategory::Item {
                 animation_mode = cursor.read_u8().context("Failed to read animation mode")?;
                 loop_count = cursor.read_i32::<LittleEndian>().context("Failed to read loop count")?;
                 start_frame = cursor.read_i8().context("Failed to read start frame")?;
