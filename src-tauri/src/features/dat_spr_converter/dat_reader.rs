@@ -219,12 +219,22 @@ impl LegacyDatReader {
             let thing = match read_thing(&mut cursor, id, LegacyCategory::Outfit, structure, is_extended, has_frame_groups, has_improved_animations) {
                 Ok(t) => t,
                 Err(e) => {
+                    // Se falhou por EOF no final do arquivo, aceita os outfits já lidos
+                    let is_eof = e.downcast_ref::<std::io::Error>()
+                        .map(|io_err| io_err.kind() == std::io::ErrorKind::UnexpectedEof)
+                        .unwrap_or(false)
+                        || format!("{}", e).contains("fill_buf")
+                        || format!("{}", e).contains("UnexpectedEof");
+                    if is_eof && !outfits.is_empty() {
+                        log::warn!(
+                            "[Parser] Outfit {} truncado no final do arquivo (pos {}). {} outfits lidos com sucesso.",
+                            id, start_pos, outfits.len()
+                        );
+                        break;
+                    }
                     log::warn!(
                         "[Parser] Falha no Outfit {} na posição {} (0x{:X}): {}",
-                        id,
-                        start_pos,
-                        start_pos,
-                        e
+                        id, start_pos, start_pos, e
                     );
                     return Err(e);
                 }
@@ -232,9 +242,7 @@ impl LegacyDatReader {
             if id <= 5 {
                 log::info!(
                     "[Parser] Outfit {} lido com sucesso (pos {}..{}): groups={}, layers={}, frames={}",
-                    id,
-                    start_pos,
-                    cursor.position(),
+                    id, start_pos, cursor.position(),
                     thing.frame_groups.len(),
                     thing.frame_groups.first().map(|g| g.layers).unwrap_or(0),
                     thing.frame_groups.first().map(|g| g.frames).unwrap_or(0)
@@ -245,14 +253,24 @@ impl LegacyDatReader {
 
         let mut effects = Vec::with_capacity(effect_count as usize);
         for id in 1..=effect_count {
-            let thing = read_thing(&mut cursor, id, LegacyCategory::Effect, structure, is_extended, has_frame_groups, has_improved_animations)?;
-            effects.push(thing);
+            match read_thing(&mut cursor, id, LegacyCategory::Effect, structure, is_extended, has_frame_groups, has_improved_animations) {
+                Ok(thing) => effects.push(thing),
+                Err(e) => {
+                    log::warn!("[Parser] Effect {} truncado/erro: {}. {} efeitos lidos.", id, e, effects.len());
+                    break;
+                }
+            }
         }
 
         let mut missiles = Vec::with_capacity(missile_count as usize);
         for id in 1..=missile_count {
-            let thing = read_thing(&mut cursor, id, LegacyCategory::Missile, structure, is_extended, has_frame_groups, has_improved_animations)?;
-            missiles.push(thing);
+            match read_thing(&mut cursor, id, LegacyCategory::Missile, structure, is_extended, has_frame_groups, has_improved_animations) {
+                Ok(thing) => missiles.push(thing),
+                Err(e) => {
+                    log::warn!("[Parser] Missile {} truncado/erro: {}. {} mísseis lidos.", id, e, missiles.len());
+                    break;
+                }
+            }
         }
 
         Ok(Self {
@@ -772,7 +790,7 @@ fn read_texture_patterns<R: Read>(
 
         if frames > 1 {
             is_animation = true;
-            if has_improved_animations && thing.category == LegacyCategory::Item {
+            if has_improved_animations {
                 animation_mode = cursor.read_u8().context("Failed to read animation mode")?;
                 loop_count = cursor.read_i32::<LittleEndian>().context("Failed to read loop count")?;
                 start_frame = cursor.read_i8().context("Failed to read start frame")?;
