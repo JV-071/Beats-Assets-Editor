@@ -215,19 +215,22 @@ impl LegacyDatReader {
 
         let mut outfits = Vec::with_capacity(outfit_count as usize);
         for id in 1..=outfit_count {
-            let start_pos = cursor.position();
+            let start_pos = cursor.position() as usize;
+            if !outfits.is_empty() && (start_pos >= file_bytes.len() || file_bytes[start_pos..].iter().all(|&b| b == 0xFF)) {
+                log::info!(
+                    "[Parser] Outfits finalizados: fim real dos dados atingido na posição {} (0x{:X}). Lidos {} outfits.",
+                    start_pos, start_pos, outfits.len()
+                );
+                break;
+            }
+
             let thing = match read_thing(&mut cursor, id, LegacyCategory::Outfit, structure, is_extended, has_frame_groups, has_improved_animations) {
                 Ok(t) => t,
                 Err(e) => {
-                    // Se falhou por EOF no final do arquivo, aceita os outfits já lidos
-                    let is_eof = e.downcast_ref::<std::io::Error>()
-                        .map(|io_err| io_err.kind() == std::io::ErrorKind::UnexpectedEof)
-                        .unwrap_or(false)
-                        || format!("{}", e).contains("fill_buf")
-                        || format!("{}", e).contains("UnexpectedEof");
-                    if is_eof && !outfits.is_empty() {
-                        log::warn!(
-                            "[Parser] Outfit {} truncado no final do arquivo (pos {}). {} outfits lidos com sucesso.",
+                    let cur_pos = cursor.position() as usize;
+                    if !outfits.is_empty() && (cur_pos >= file_bytes.len() || file_bytes[cur_pos.min(file_bytes.len())..].iter().all(|&b| b == 0xFF)) {
+                        log::info!(
+                            "[Parser] Outfit {} atingiu 0xFF padding no final do arquivo (pos {}). Lidos {} outfits com sucesso.",
                             id, start_pos, outfits.len()
                         );
                         break;
@@ -253,9 +256,17 @@ impl LegacyDatReader {
 
         let mut effects = Vec::with_capacity(effect_count as usize);
         for id in 1..=effect_count {
+            let start_pos = cursor.position() as usize;
+            if start_pos >= file_bytes.len() || file_bytes[start_pos..].iter().all(|&b| b == 0xFF) {
+                break;
+            }
             match read_thing(&mut cursor, id, LegacyCategory::Effect, structure, is_extended, has_frame_groups, has_improved_animations) {
                 Ok(thing) => effects.push(thing),
                 Err(e) => {
+                    let cur_pos = cursor.position() as usize;
+                    if cur_pos >= file_bytes.len() || file_bytes[cur_pos.min(file_bytes.len())..].iter().all(|&b| b == 0xFF) {
+                        break;
+                    }
                     log::warn!("[Parser] Effect {} truncado/erro: {}. {} efeitos lidos.", id, e, effects.len());
                     break;
                 }
@@ -264,9 +275,17 @@ impl LegacyDatReader {
 
         let mut missiles = Vec::with_capacity(missile_count as usize);
         for id in 1..=missile_count {
+            let start_pos = cursor.position() as usize;
+            if start_pos >= file_bytes.len() || file_bytes[start_pos..].iter().all(|&b| b == 0xFF) {
+                break;
+            }
             match read_thing(&mut cursor, id, LegacyCategory::Missile, structure, is_extended, has_frame_groups, has_improved_animations) {
                 Ok(thing) => missiles.push(thing),
                 Err(e) => {
+                    let cur_pos = cursor.position() as usize;
+                    if cur_pos >= file_bytes.len() || file_bytes[cur_pos.min(file_bytes.len())..].iter().all(|&b| b == 0xFF) {
+                        break;
+                    }
                     log::warn!("[Parser] Missile {} truncado/erro: {}. {} mísseis lidos.", id, e, missiles.len());
                     break;
                 }
